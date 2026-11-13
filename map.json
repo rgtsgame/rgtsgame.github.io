@@ -1,0 +1,1917 @@
+{
+  "meta": {
+    "name": "custom_map",
+    "version": 1
+  },
+  "spawnPoints": [
+    {
+      "id": "sp_1",
+      "position": [
+        0,
+        1.6,
+        0
+      ],
+      "rotation": 0
+    }
+  ],
+  "meshes": [
+    {
+      "id": "ground",
+      "type": "plane",
+      "size": [
+        100,
+        100
+      ],
+      "position": [
+        0,
+        0,
+        0
+      ],
+      "rotation": [
+        -1.5708,
+        0,
+        0
+      ],
+      "material": {
+        "color": "#4c7a34"
+      },
+      "collidable": false
+    },
+    {
+      "id": "border_wall_s",
+      "type": "box",
+      "size": [
+        50,
+        12.5,
+        1
+      ],
+      "position": [
+        0,
+        2.5,
+        25
+      ],
+      "rotation": [
+        0,
+        0,
+        0
+      ],
+      "material": {
+        "color": "#37474F"
+      },
+      "collidable": true
+    },
+    {
+      "id": "border_wall_n",
+      "type": "box",
+      "size": [
+        50,
+        12.5,
+        1
+      ],
+      "position": [
+        0,
+        2.5,
+        -25
+      ],
+      "rotation": [
+        0,
+        0,
+        0
+      ],
+      "material": {
+        "color": "#37474F"
+      },
+      "collidable": true
+    },
+    {
+      "id": "border_wall_w",
+      "type": "box",
+      "size": [
+        1,
+        12.5,
+        50
+      ],
+      "position": [
+        -25,
+        2.5,
+        0
+      ],
+      "rotation": [
+        0,
+        0,
+        0
+      ],
+      "material": {
+        "color": "#37474F"
+      },
+      "collidable": true
+    },
+    {
+      "id": "border_wall_e",
+      "type": "box",
+      "size": [
+        1,
+        12.5,
+        50
+      ],
+      "position": [
+        25,
+        2.5,
+        0
+      ],
+      "rotation": [
+        0,
+        0,
+        0
+      ],
+      "material": {
+        "color": "#37474F"
+      },
+      "collidable": true
+    },
+    {
+      "id": "center_platform",
+      "type": "box",
+      "size": [
+        8,
+        3,
+        8
+      ],
+      "position": [
+        -11.5,
+        1.5,
+        -10
+      ],
+      "rotation": [
+        0,
+        0.755903461943738,
+        0
+      ],
+      "material": {
+        "color": "#B0BEC5"
+      },
+      "collidable": true
+    },
+    {
+      "id": "center_pillar_1",
+      "type": "box",
+      "size": [
+        2,
+        1,
+        2
+      ],
+      "position": [
+        -3,
+        0.5,
+        -3
+      ],
+      "rotation": [
+        0,
+        0,
+        0
+      ],
+      "material": {
+        "color": "#90A4AE"
+      },
+      "collidable": true
+    },
+    {
+      "id": "center_pillar_2",
+      "type": "box",
+      "size": [
+        2,
+        3,
+        2
+      ],
+      "position": [
+        1.5,
+        0,
+        2.5
+      ],
+      "rotation": [
+        0,
+        0,
+        0
+      ],
+      "material": {
+        "color": "#90A4AE"
+      },
+      "collidable": true
+    },
+    {
+      "id": "center_step_sw",
+      "type": "box",
+      "size": [
+        2,
+        1,
+        2
+      ],
+      "position": [
+        -5,
+        0.5,
+        5
+      ],
+      "rotation": [
+        0,
+        0,
+        0
+      ],
+      "material": {
+        "color": "#CFD8DC"
+      },
+      "collidable": true
+    },
+    {
+      "id": "center_step_ne",
+      "type": "box",
+      "size": [
+        2,
+        1,
+        2
+      ],
+      "position": [
+        5,
+        0.5,
+        -5
+      ],
+      "rotation": [
+        0,
+        0,
+        0
+      ],
+      "material": {
+        "color": "#CFD8DC"
+      },
+      "collidable": true
+    },
+    {
+      "id": "center_catwalk_sw",
+      "type": "box",
+      "size": [
+        5,
+        0.5,
+        2
+      ],
+      "position": [
+        -7,
+        2.5,
+        7
+      ],
+      "rotation": [
+        0,
+        0,
+        0
+      ],
+      "material": {
+        "color": "#B0BEC5"
+      },
+      "collidable": true
+    },
+    {
+      "id": "center_catwalk_ne",
+      "type": "box",
+      "size": [
+        5,
+        0.5,
+        2
+      ],
+      "position": [
+        7,
+        2.5,
+        -7
+      ],
+      "rotation": [
+        0,
+        0,
+        0
+      ],
+      "material": {
+        "color": "#B0BEC5"
+      },
+      "collidable": true
+    },
+    {
+      "id": "center_catwalk_support_sw",
+      "type": "box",
+      "size": [
+        0.5,
+        2.5,
+        0.5
+      ],
+      "position": [
+        -7,
+        1.25,
+        7
+      ],
+      "rotation": [
+        0,
+        0,
+        0
+      ],
+      "material": {
+        "color": "#90A4AE"
+      },
+      "collidable": true
+    },
+    {
+      "id": "center_catwalk_support_ne",
+      "type": "box",
+      "size": [
+        0.5,
+        2.5,
+        0.5
+      ],
+      "position": [
+        7,
+        1.25,
+        -7
+      ],
+      "rotation": [
+        0,
+        0,
+        0
+      ],
+      "material": {
+        "color": "#90A4AE"
+      },
+      "collidable": true
+    },
+    {
+      "id": "t1_wall_a",
+      "type": "box",
+      "size": [
+        7,
+        3,
+        1
+      ],
+      "position": [
+        -15,
+        1.5,
+        15
+      ],
+      "rotation": [
+        0,
+        0,
+        0
+      ],
+      "material": {
+        "color": "#FF5252"
+      },
+      "collidable": true
+    },
+    {
+      "id": "t1_wall_b",
+      "type": "box",
+      "size": [
+        1,
+        3,
+        7
+      ],
+      "position": [
+        -15,
+        1.5,
+        20
+      ],
+      "rotation": [
+        0,
+        0,
+        0
+      ],
+      "material": {
+        "color": "#FF5252"
+      },
+      "collidable": true
+    },
+    {
+      "id": "t1_wall_c",
+      "type": "box",
+      "size": [
+        6,
+        3,
+        1
+      ],
+      "position": [
+        -21,
+        1.5,
+        12
+      ],
+      "rotation": [
+        0,
+        0,
+        0
+      ],
+      "material": {
+        "color": "#E53935"
+      },
+      "collidable": true
+    },
+    {
+      "id": "t1_cover_a",
+      "type": "box",
+      "size": [
+        3,
+        1,
+        3
+      ],
+      "position": [
+        -11,
+        0.5,
+        11
+      ],
+      "rotation": [
+        0,
+        0,
+        0
+      ],
+      "material": {
+        "color": "#FF7043"
+      },
+      "collidable": true
+    },
+    {
+      "id": "t1_cover_b",
+      "type": "box",
+      "size": [
+        2,
+        1,
+        3
+      ],
+      "position": [
+        -17,
+        0.5,
+        8
+      ],
+      "rotation": [
+        0,
+        0,
+        0
+      ],
+      "material": {
+        "color": "#FF7043"
+      },
+      "collidable": true
+    },
+    {
+      "id": "t1_stack_1",
+      "type": "box",
+      "size": [
+        2,
+        1,
+        2
+      ],
+      "position": [
+        -10,
+        0.5,
+        16
+      ],
+      "rotation": [
+        0,
+        0,
+        0
+      ],
+      "material": {
+        "color": "#FF8A65"
+      },
+      "collidable": true
+    },
+    {
+      "id": "t1_stack_2",
+      "type": "box",
+      "size": [
+        2,
+        1,
+        2
+      ],
+      "position": [
+        -10,
+        1.5,
+        16
+      ],
+      "rotation": [
+        0,
+        0,
+        0
+      ],
+      "material": {
+        "color": "#FF8A65"
+      },
+      "collidable": true
+    },
+    {
+      "id": "t1_stack_3",
+      "type": "box",
+      "size": [
+        2,
+        1,
+        2
+      ],
+      "position": [
+        -10,
+        2.5,
+        16
+      ],
+      "rotation": [
+        0,
+        0,
+        0
+      ],
+      "material": {
+        "color": "#FF8A65"
+      },
+      "collidable": true
+    },
+    {
+      "id": "t1_catwalk",
+      "type": "box",
+      "size": [
+        2,
+        0.5,
+        7
+      ],
+      "position": [
+        -19,
+        2.5,
+        12
+      ],
+      "rotation": [
+        0,
+        0,
+        0
+      ],
+      "material": {
+        "color": "#FF5252"
+      },
+      "collidable": true
+    },
+    {
+      "id": "t1_catwalk_support",
+      "type": "box",
+      "size": [
+        0.5,
+        2.5,
+        0.5
+      ],
+      "position": [
+        -19,
+        1.25,
+        12
+      ],
+      "rotation": [
+        0,
+        0,
+        0
+      ],
+      "material": {
+        "color": "#FF7043"
+      },
+      "collidable": true
+    },
+    {
+      "id": "t1_truck_body",
+      "type": "box",
+      "size": [
+        4,
+        2,
+        2
+      ],
+      "position": [
+        -20,
+        1,
+        20
+      ],
+      "rotation": [
+        0,
+        0.785398,
+        0
+      ],
+      "material": {
+        "color": "#D32F2F"
+      },
+      "collidable": true
+    },
+    {
+      "id": "t1_truck_cab",
+      "type": "box",
+      "size": [
+        1.5,
+        1.5,
+        2
+      ],
+      "position": [
+        -18,
+        0.75,
+        22
+      ],
+      "rotation": [
+        0,
+        0.785398,
+        0
+      ],
+      "material": {
+        "color": "#B71C1C"
+      },
+      "collidable": true
+    },
+    {
+      "id": "t1_shipping_container",
+      "type": "box",
+      "size": [
+        6,
+        2.5,
+        2.5
+      ],
+      "position": [
+        -6,
+        1.25,
+        18
+      ],
+      "rotation": [
+        0,
+        0,
+        0
+      ],
+      "material": {
+        "color": "#E53935"
+      },
+      "collidable": true
+    },
+    {
+      "id": "t1_barrier_1",
+      "type": "box",
+      "size": [
+        3,
+        1,
+        1
+      ],
+      "position": [
+        -20,
+        0.5,
+        4
+      ],
+      "rotation": [
+        0,
+        0.785398,
+        0
+      ],
+      "material": {
+        "color": "#FF7043"
+      },
+      "collidable": true
+    },
+    {
+      "id": "t1_barrier_2",
+      "type": "box",
+      "size": [
+        1,
+        1,
+        4
+      ],
+      "position": [
+        -8,
+        0.5,
+        22
+      ],
+      "rotation": [
+        0,
+        0,
+        0
+      ],
+      "material": {
+        "color": "#FF7043"
+      },
+      "collidable": true
+    },
+    {
+      "id": "t1_sniper_perch",
+      "type": "box",
+      "size": [
+        4,
+        4,
+        4
+      ],
+      "position": [
+        -22,
+        2,
+        6
+      ],
+      "rotation": [
+        0,
+        0,
+        0
+      ],
+      "material": {
+        "color": "#B71C1C"
+      },
+      "collidable": true
+    },
+    {
+      "id": "t1_ramp_1",
+      "type": "box",
+      "size": [
+        3,
+        0.5,
+        3
+      ],
+      "position": [
+        -15,
+        0.25,
+        4
+      ],
+      "rotation": [
+        0,
+        0,
+        0
+      ],
+      "material": {
+        "color": "#E53935"
+      },
+      "collidable": true
+    },
+    {
+      "id": "t1_ramp_2",
+      "type": "box",
+      "size": [
+        3,
+        1,
+        3
+      ],
+      "position": [
+        -18,
+        0.5,
+        4
+      ],
+      "rotation": [
+        0,
+        0,
+        0
+      ],
+      "material": {
+        "color": "#E53935"
+      },
+      "collidable": true
+    },
+    {
+      "id": "t1_ramp_3",
+      "type": "box",
+      "size": [
+        3,
+        1.5,
+        3
+      ],
+      "position": [
+        -21,
+        0.75,
+        4
+      ],
+      "rotation": [
+        0,
+        0,
+        0
+      ],
+      "material": {
+        "color": "#E53935"
+      },
+      "collidable": true
+    },
+    {
+      "id": "t2_wall_a",
+      "type": "box",
+      "size": [
+        7,
+        3,
+        1
+      ],
+      "position": [
+        15,
+        1.5,
+        -15
+      ],
+      "rotation": [
+        0,
+        0,
+        0
+      ],
+      "material": {
+        "color": "#29B6F6"
+      },
+      "collidable": true
+    },
+    {
+      "id": "t2_wall_b",
+      "type": "box",
+      "size": [
+        1,
+        3,
+        7
+      ],
+      "position": [
+        15,
+        1.5,
+        -20
+      ],
+      "rotation": [
+        0,
+        0,
+        0
+      ],
+      "material": {
+        "color": "#29B6F6"
+      },
+      "collidable": true
+    },
+    {
+      "id": "t2_wall_c",
+      "type": "box",
+      "size": [
+        6,
+        3,
+        1
+      ],
+      "position": [
+        21,
+        1.5,
+        -12
+      ],
+      "rotation": [
+        0,
+        0,
+        0
+      ],
+      "material": {
+        "color": "#039BE5"
+      },
+      "collidable": true
+    },
+    {
+      "id": "t2_cover_a",
+      "type": "box",
+      "size": [
+        3,
+        1,
+        3
+      ],
+      "position": [
+        11,
+        0.5,
+        -11
+      ],
+      "rotation": [
+        0,
+        0,
+        0
+      ],
+      "material": {
+        "color": "#4FC3F7"
+      },
+      "collidable": true
+    },
+    {
+      "id": "t2_cover_b",
+      "type": "box",
+      "size": [
+        2,
+        1,
+        3
+      ],
+      "position": [
+        17,
+        0.5,
+        -8
+      ],
+      "rotation": [
+        0,
+        0,
+        0
+      ],
+      "material": {
+        "color": "#4FC3F7"
+      },
+      "collidable": true
+    },
+    {
+      "id": "t2_stack_1",
+      "type": "box",
+      "size": [
+        2,
+        1,
+        2
+      ],
+      "position": [
+        10,
+        0.5,
+        -16
+      ],
+      "rotation": [
+        0,
+        0,
+        0
+      ],
+      "material": {
+        "color": "#81D4FA"
+      },
+      "collidable": true
+    },
+    {
+      "id": "t2_stack_2",
+      "type": "box",
+      "size": [
+        2,
+        1,
+        2
+      ],
+      "position": [
+        10,
+        1.5,
+        -16
+      ],
+      "rotation": [
+        0,
+        0,
+        0
+      ],
+      "material": {
+        "color": "#81D4FA"
+      },
+      "collidable": true
+    },
+    {
+      "id": "t2_stack_3",
+      "type": "box",
+      "size": [
+        2,
+        1,
+        2
+      ],
+      "position": [
+        10,
+        2.5,
+        -16
+      ],
+      "rotation": [
+        0,
+        0,
+        0
+      ],
+      "material": {
+        "color": "#81D4FA"
+      },
+      "collidable": true
+    },
+    {
+      "id": "t2_catwalk",
+      "type": "box",
+      "size": [
+        2,
+        0.5,
+        7
+      ],
+      "position": [
+        19,
+        2.5,
+        -12
+      ],
+      "rotation": [
+        0,
+        0,
+        0
+      ],
+      "material": {
+        "color": "#29B6F6"
+      },
+      "collidable": true
+    },
+    {
+      "id": "t2_catwalk_support",
+      "type": "box",
+      "size": [
+        0.5,
+        2.5,
+        0.5
+      ],
+      "position": [
+        19,
+        1.25,
+        -12
+      ],
+      "rotation": [
+        0,
+        0,
+        0
+      ],
+      "material": {
+        "color": "#4FC3F7"
+      },
+      "collidable": true
+    },
+    {
+      "id": "t2_truck_body",
+      "type": "box",
+      "size": [
+        4,
+        2,
+        2
+      ],
+      "position": [
+        20,
+        1,
+        -20
+      ],
+      "rotation": [
+        0,
+        0.785398,
+        0
+      ],
+      "material": {
+        "color": "#0288D1"
+      },
+      "collidable": true
+    },
+    {
+      "id": "t2_truck_cab",
+      "type": "box",
+      "size": [
+        1.5,
+        1.5,
+        2
+      ],
+      "position": [
+        18,
+        0.75,
+        -22
+      ],
+      "rotation": [
+        0,
+        0.785398,
+        0
+      ],
+      "material": {
+        "color": "#01579B"
+      },
+      "collidable": true
+    },
+    {
+      "id": "t2_shipping_container",
+      "type": "box",
+      "size": [
+        6,
+        2.5,
+        2.5
+      ],
+      "position": [
+        6,
+        1.25,
+        -18
+      ],
+      "rotation": [
+        0,
+        0,
+        0
+      ],
+      "material": {
+        "color": "#039BE5"
+      },
+      "collidable": true
+    },
+    {
+      "id": "t2_barrier_1",
+      "type": "box",
+      "size": [
+        3,
+        1,
+        1
+      ],
+      "position": [
+        20,
+        0.5,
+        -4
+      ],
+      "rotation": [
+        0,
+        0.785398,
+        0
+      ],
+      "material": {
+        "color": "#4FC3F7"
+      },
+      "collidable": true
+    },
+    {
+      "id": "t2_barrier_2",
+      "type": "box",
+      "size": [
+        1,
+        1,
+        4
+      ],
+      "position": [
+        8,
+        0.5,
+        -22
+      ],
+      "rotation": [
+        0,
+        0,
+        0
+      ],
+      "material": {
+        "color": "#4FC3F7"
+      },
+      "collidable": true
+    },
+    {
+      "id": "t2_sniper_perch",
+      "type": "box",
+      "size": [
+        4,
+        4,
+        4
+      ],
+      "position": [
+        22,
+        2,
+        -6
+      ],
+      "rotation": [
+        0,
+        0,
+        0
+      ],
+      "material": {
+        "color": "#01579B"
+      },
+      "collidable": true
+    },
+    {
+      "id": "t2_ramp_1",
+      "type": "box",
+      "size": [
+        3,
+        0.5,
+        3
+      ],
+      "position": [
+        15,
+        0.25,
+        -4
+      ],
+      "rotation": [
+        0,
+        0,
+        0
+      ],
+      "material": {
+        "color": "#039BE5"
+      },
+      "collidable": true
+    },
+    {
+      "id": "t2_ramp_2",
+      "type": "box",
+      "size": [
+        3,
+        1,
+        3
+      ],
+      "position": [
+        18,
+        0.5,
+        -4
+      ],
+      "rotation": [
+        0,
+        0,
+        0
+      ],
+      "material": {
+        "color": "#039BE5"
+      },
+      "collidable": true
+    },
+    {
+      "id": "t2_ramp_3",
+      "type": "box",
+      "size": [
+        3,
+        1.5,
+        3
+      ],
+      "position": [
+        21,
+        0.75,
+        -4
+      ],
+      "rotation": [
+        0,
+        0,
+        0
+      ],
+      "material": {
+        "color": "#039BE5"
+      },
+      "collidable": true
+    },
+    {
+      "id": "mid_cover_sw",
+      "type": "box",
+      "size": [
+        2,
+        1,
+        2
+      ],
+      "position": [
+        -6,
+        0.5,
+        2
+      ],
+      "rotation": [
+        0,
+        0,
+        0
+      ],
+      "material": {
+        "color": "#CFD8DC"
+      },
+      "collidable": true
+    },
+    {
+      "id": "mid_cover_ne",
+      "type": "box",
+      "size": [
+        2,
+        1,
+        2
+      ],
+      "position": [
+        6,
+        0.5,
+        -2
+      ],
+      "rotation": [
+        0,
+        0,
+        0
+      ],
+      "material": {
+        "color": "#CFD8DC"
+      },
+      "collidable": true
+    },
+    {
+      "id": "mid_cover_sw2",
+      "type": "box",
+      "size": [
+        3,
+        1,
+        2
+      ],
+      "position": [
+        -2,
+        0.5,
+        8
+      ],
+      "rotation": [
+        0,
+        0,
+        0
+      ],
+      "material": {
+        "color": "#B0BEC5"
+      },
+      "collidable": true
+    },
+    {
+      "id": "mid_cover_ne2",
+      "type": "box",
+      "size": [
+        3,
+        1,
+        2
+      ],
+      "position": [
+        2,
+        0.5,
+        -8
+      ],
+      "rotation": [
+        0,
+        0,
+        0
+      ],
+      "material": {
+        "color": "#B0BEC5"
+      },
+      "collidable": true
+    },
+    {
+      "id": "mid_barrier_sw",
+      "type": "box",
+      "size": [
+        4,
+        1.5,
+        1
+      ],
+      "position": [
+        -12,
+        0.75,
+        4
+      ],
+      "rotation": [
+        0,
+        -0.7559032985463191,
+        0
+      ],
+      "material": {
+        "color": "#78909C"
+      },
+      "collidable": true
+    },
+    {
+      "id": "mid_barrier_ne",
+      "type": "box",
+      "size": [
+        4,
+        1.5,
+        1
+      ],
+      "position": [
+        12,
+        0.75,
+        -4
+      ],
+      "rotation": [
+        0,
+        -0.8148927014536826,
+        0
+      ],
+      "material": {
+        "color": "#78909C"
+      },
+      "collidable": true
+    },
+    {
+      "id": "mid_box_sw",
+      "type": "box",
+      "size": [
+        1.5,
+        1.5,
+        1.5
+      ],
+      "position": [
+        -14,
+        0.75,
+        20
+      ],
+      "rotation": [
+        0,
+        0.5,
+        0
+      ],
+      "material": {
+        "color": "#90A4AE"
+      },
+      "collidable": true
+    },
+    {
+      "id": "mid_box_ne",
+      "type": "box",
+      "size": [
+        1.5,
+        1.5,
+        1.5
+      ],
+      "position": [
+        14,
+        0.75,
+        -20
+      ],
+      "rotation": [
+        0,
+        0.5,
+        0
+      ],
+      "material": {
+        "color": "#90A4AE"
+      },
+      "collidable": true
+    },
+    {
+      "id": "mid_cover_s",
+      "type": "box",
+      "size": [
+        6,
+        1,
+        2
+      ],
+      "position": [
+        19.5,
+        0.5,
+        21
+      ],
+      "rotation": [
+        0,
+        0,
+        0
+      ],
+      "material": {
+        "color": "#B0BEC5"
+      },
+      "collidable": true
+    },
+    {
+      "id": "mid_cover_n",
+      "type": "box",
+      "size": [
+        6,
+        1,
+        2
+      ],
+      "position": [
+        -14,
+        0.5,
+        -20
+      ],
+      "rotation": [
+        0,
+        0,
+        0
+      ],
+      "material": {
+        "color": "#B0BEC5"
+      },
+      "collidable": true
+    },
+    {
+      "id": "mid_wall_e",
+      "type": "box",
+      "size": [
+        1,
+        2,
+        4
+      ],
+      "position": [
+        22,
+        1,
+        4
+      ],
+      "rotation": [
+        0,
+        0,
+        0
+      ],
+      "material": {
+        "color": "#B0BEC5"
+      },
+      "collidable": true
+    },
+    {
+      "id": "mid_wall_w",
+      "type": "box",
+      "size": [
+        1,
+        2,
+        4
+      ],
+      "position": [
+        -22,
+        1,
+        -4
+      ],
+      "rotation": [
+        0,
+        0,
+        0
+      ],
+      "material": {
+        "color": "#B0BEC5"
+      },
+      "collidable": true
+    },
+    {
+      "id": "box_65",
+      "type": "box",
+      "size": [
+        9,
+        6,
+        1
+      ],
+      "position": [
+        8,
+        3,
+        9.5
+      ],
+      "rotation": [
+        0,
+        0,
+        0
+      ],
+      "material": {
+        "color": "#36e739"
+      },
+      "collidable": true
+    },
+    {
+      "id": "box_66",
+      "type": "box",
+      "size": [
+        9,
+        6,
+        1
+      ],
+      "position": [
+        11,
+        3,
+        14
+      ],
+      "rotation": [
+        0,
+        0,
+        0
+      ],
+      "material": {
+        "color": "#36e739"
+      },
+      "collidable": true
+    },
+    {
+      "id": "box_67",
+      "type": "box",
+      "size": [
+        9,
+        6,
+        1
+      ],
+      "position": [
+        15.5,
+        3,
+        18.5
+      ],
+      "rotation": [
+        0,
+        0,
+        0
+      ],
+      "material": {
+        "color": "#36e739"
+      },
+      "collidable": true
+    },
+    {
+      "id": "box_68",
+      "type": "box",
+      "size": [
+        1,
+        1,
+        2
+      ],
+      "position": [
+        9,
+        0.5,
+        4
+      ],
+      "rotation": [
+        0,
+        0,
+        0
+      ],
+      "material": {
+        "color": "#B0BEC5"
+      },
+      "collidable": true
+    },
+    {
+      "id": "box_69",
+      "type": "box",
+      "size": [
+        1,
+        1,
+        2
+      ],
+      "position": [
+        8,
+        1,
+        4
+      ],
+      "rotation": [
+        0,
+        0,
+        0
+      ],
+      "material": {
+        "color": "#B0BEC5"
+      },
+      "collidable": true
+    },
+    {
+      "id": "box_70",
+      "type": "box",
+      "size": [
+        1,
+        1,
+        2
+      ],
+      "position": [
+        7,
+        1.5,
+        4
+      ],
+      "rotation": [
+        0,
+        0,
+        0
+      ],
+      "material": {
+        "color": "#B0BEC5"
+      },
+      "collidable": true
+    },
+    {
+      "id": "box_71",
+      "type": "box",
+      "size": [
+        1,
+        1,
+        2
+      ],
+      "position": [
+        6,
+        2,
+        4
+      ],
+      "rotation": [
+        0,
+        0,
+        0
+      ],
+      "material": {
+        "color": "#B0BEC5"
+      },
+      "collidable": true
+    },
+    {
+      "id": "box_72",
+      "type": "box",
+      "size": [
+        1,
+        1,
+        2
+      ],
+      "position": [
+        5,
+        2.5,
+        4
+      ],
+      "rotation": [
+        0,
+        0,
+        0
+      ],
+      "material": {
+        "color": "#B0BEC5"
+      },
+      "collidable": true
+    },
+    {
+      "id": "box_73",
+      "type": "box",
+      "size": [
+        9,
+        6,
+        1
+      ],
+      "position": [
+        5,
+        3,
+        5.5
+      ],
+      "rotation": [
+        0,
+        0,
+        0
+      ],
+      "material": {
+        "color": "#36e739"
+      },
+      "collidable": true
+    },
+    {
+      "id": "box_74",
+      "type": "box",
+      "size": [
+        1,
+        1,
+        2
+      ],
+      "position": [
+        4,
+        3,
+        4
+      ],
+      "rotation": [
+        0,
+        0,
+        0
+      ],
+      "material": {
+        "color": "#B0BEC5"
+      },
+      "collidable": true
+    },
+    {
+      "id": "box_75",
+      "type": "box",
+      "size": [
+        1,
+        1,
+        2
+      ],
+      "position": [
+        3,
+        3.5,
+        4
+      ],
+      "rotation": [
+        0,
+        0,
+        0
+      ],
+      "material": {
+        "color": "#B0BEC5"
+      },
+      "collidable": true
+    },
+    {
+      "id": "box_76",
+      "type": "box",
+      "size": [
+        1,
+        1,
+        2
+      ],
+      "position": [
+        2,
+        4,
+        4
+      ],
+      "rotation": [
+        0,
+        0,
+        0
+      ],
+      "material": {
+        "color": "#B0BEC5"
+      },
+      "collidable": true
+    },
+    {
+      "id": "box_77",
+      "type": "box",
+      "size": [
+        1,
+        1,
+        2
+      ],
+      "position": [
+        1,
+        4.5,
+        4
+      ],
+      "rotation": [
+        0,
+        0,
+        0
+      ],
+      "material": {
+        "color": "#B0BEC5"
+      },
+      "collidable": true
+    },
+    {
+      "id": "box_78",
+      "type": "box",
+      "size": [
+        5,
+        0.75,
+        7
+      ],
+      "position": [
+        -2,
+        5.5,
+        4
+      ],
+      "rotation": [
+        0,
+        0,
+        0
+      ],
+      "material": {
+        "color": "#B0BEC5"
+      },
+      "collidable": true
+    },
+    {
+      "id": "box_79",
+      "type": "box",
+      "size": [
+        0.5,
+        7.5,
+        0.5
+      ],
+      "position": [
+        -2,
+        2,
+        4
+      ],
+      "rotation": [
+        0,
+        -0.7853981633974484,
+        0
+      ],
+      "material": {
+        "color": "#90A4AE"
+      },
+      "collidable": true
+    },
+    {
+      "id": "box_80",
+      "type": "box",
+      "size": [
+        1,
+        1,
+        2
+      ],
+      "position": [
+        10,
+        0,
+        4
+      ],
+      "rotation": [
+        0,
+        0,
+        0
+      ],
+      "material": {
+        "color": "#B0BEC5"
+      },
+      "collidable": true
+    },
+    {
+      "id": "box_81",
+      "type": "box",
+      "size": [
+        12,
+        1,
+        5
+      ],
+      "position": [
+        -7.5,
+        2.5,
+        -20
+      ],
+      "rotation": [
+        0,
+        0,
+        -0.5235987755982988
+      ],
+      "material": {
+        "color": "#b4e826"
+      },
+      "collidable": true
+    },
+    {
+      "id": "box_82",
+      "type": "box",
+      "size": [
+        4,
+        1,
+        12
+      ],
+      "position": [
+        -14.5,
+        5.5,
+        -16.5
+      ],
+      "rotation": [
+        0,
+        0,
+        0
+      ],
+      "material": {
+        "color": "#b4e826"
+      },
+      "collidable": true
+    }
+  ],
+  "powerups": [
+    {
+      "id": "pu_health_1",
+      "type": "health",
+      "position": [
+        0,
+        0.5,
+        -10
+      ],
+      "respawnTime": 15,
+      "amount": 50
+    }
+  ]
+}
