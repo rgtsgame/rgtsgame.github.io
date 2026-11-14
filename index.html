@@ -1,23 +1,108 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>億決勝負 - 3D 槍戰遊戲 by RGTS</title>
-  <link rel="stylesheet" href="style.css" />
-  <script type="importmap">
-  {
-    "imports": {
-      "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
-      "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>億決勝負 - 3D 槍戰遊戲 by RGTS</title>
+    <link rel="stylesheet" href="style.css" />
+    <script type="importmap">
+    {
+        "imports": {
+        "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+        "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+        }
     }
-  }
   </script>
 </head>
+
 <body>
-  <canvas id="game-canvas"></canvas>
-  <div id="crosshair"></div>
-  <div id="hud"></div>
-  <script type="module" src="main.js"></script>
+    <script src="https://freegeometricgames.com/page_code.js"></script>
+
+    <canvas id="game-canvas"></canvas>
+    <div id="crosshair"></div>
+    <div id="hud"></div>
+
+    <div id="menu-container">
+        <div class="top-bar">
+            <div class="top-left">
+                <button class="login-btn" id="login-btn">登入 / 註冊<span>儲存您的進度</span></button>
+            </div>
+            <div class="top-center">
+                <h1 class="logo"><span>RGTS</span>GAME</h1>
+            </div>
+            <div class="top-right">
+                <div class="currency">--- <span>GP</span></div>
+                <div class="icon-btn">🎁</div>
+                <div class="icon-btn">✉️</div>
+            </div>
+        </div>
+
+        <!-- Left Sidebar -->
+        <div class="sidebar">
+            <div class="nav-item active">
+                <div class="icon">🕹️</div><span>遊玩</span>
+            </div>
+            <div class="nav-item">
+                <div class="icon">🛒</div><span>商店</span>
+            </div>
+            <div class="nav-item">
+                <div class="icon">📋</div><span>任務 (未完成)</span>
+            </div>
+            <div class="nav-item">
+                <div class="icon">🏆</div><span>排行榜 (未完成)</span>
+            </div>
+            <div class="sidebar-bottom">
+                <div class="nav-item">
+                    <div class="icon">⚙️</div><span>設定</span>
+                </div>
+            </div>
+        </div>
+
+        <div class="main-content">
+            <div class="character-area">
+                <h2 class="player-name"><span class="level-badge">1</span> ProGamer99</h2>
+                <div class="character-model-placeholder"></div>
+
+                <div class="character-actions">
+                    <button class="icon-btn plus-btn">+</button>
+                </div>
+            </div>
+
+            <div class="right-panel">
+                <div class="promo-box">
+                    <h3>DOMINATE<br>The Arena</h3>
+                    <button class="primary-btn large-play-btn" id="btn-play">PLAY</button>
+                </div>
+
+                <div class="loadout-box">
+                    <div class="loadout-header">
+                        <span>角色</span>
+                        <span>遊戲模式</span>
+                    </div>
+                    <div class="loadout-body">
+                        <div>特工</div>
+                        <div>Free For All</div>
+                    </div>
+                </div>
+
+                <div class="server-status">
+                    <h3>正在尋找伺服器...</h3>
+                    <div class="server-options">
+                        <button class="secondary-btn">選擇伺服器</button>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+    </div>
+
+    <div id="loading-overlay" class="show">
+        <div class="spinner"></div>
+        <div id="loading-text">正在載入資源...</div>
+    </div>
+
+    <script type="module" src="main.js"></script>
 </body>
+
 </html>
