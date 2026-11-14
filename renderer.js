@@ -5,6 +5,10 @@ let gunModel;
 let debugHitboxesGroup = null;
 let loadedMeshes = [];
 
+const bulletHoleTexture = new THREE.TextureLoader().load('bullet_hole.png');
+const bulletHoles = [];
+const MAX_BULLET_HOLES = 50;
+
 // Generates a small grass texture using HTML Canvas
 function createGrassTexture() {
     const canvas = document.createElement('canvas');
@@ -88,6 +92,63 @@ function createGun() {
     gunModel.position.set(0.25, -0.2, -0.5);
     gunModel.rotation.y = -0.05;
     camera.add(gunModel);
+}
+
+export const npcMeshes = [];
+
+export function spawnNPCMesh(id, position) {
+    // Create a simple blocky character
+    const group = new THREE.Group();
+    group.position.set(position[0], position[1], position[2]);
+
+    const bodyMat = new THREE.MeshStandardMaterial({ color: 0xff2222 });
+    const headMat = new THREE.MeshStandardMaterial({ color: 0xffccaa });
+
+    // Torso
+    const body = new THREE.Mesh(new THREE.BoxGeometry(0.8, 1.2, 0.4), bodyMat);
+    body.position.y = 1.0;
+    body.castShadow = true;
+    group.add(body);
+
+    // Head
+    const head = new THREE.Mesh(new THREE.BoxGeometry(0.4, 0.4, 0.4), headMat);
+    head.position.y = 1.8;
+    head.castShadow = true;
+    group.add(head);
+
+    // Arms
+    const armL = new THREE.Mesh(new THREE.BoxGeometry(0.25, 1, 0.25), bodyMat);
+    armL.position.set(-0.55, 1.0, 0);
+    armL.castShadow = true;
+    group.add(armL);
+
+    const armR = new THREE.Mesh(new THREE.BoxGeometry(0.25, 1, 0.25), bodyMat);
+    armR.position.set(0.55, 1.0, 0);
+    armR.castShadow = true;
+    group.add(armR);
+
+    group.userData = { id: id, type: 'npc', bodyMesh: body, isDead: false };
+    scene.add(group);
+    npcMeshes.push(group);
+    return group;
+}
+
+export function removeNPCMesh(id) {
+    const index = npcMeshes.findIndex(n => n.userData.id === id);
+    if (index !== -1) {
+        scene.remove(npcMeshes[index]);
+        npcMeshes.splice(index, 1);
+    }
+}
+
+export function flashNPC(id) {
+    const npc = npcMeshes.find(n => n.userData.id === id);
+    if (npc && !npc.userData.isDead) {
+        npc.userData.bodyMesh.material.color.setHex(0xffffff); // Flash white
+        setTimeout(() => {
+            if (!npc.userData.isDead) npc.userData.bodyMesh.material.color.setHex(0xff2222);
+        }, 100);
+    }
 }
 
 export async function loadMap(url) {
@@ -190,6 +251,78 @@ export function updateViewModel(time, isMoving) {
     } else {
         gunModel.position.x += (0.25 - gunModel.position.x) * 0.1;
         gunModel.position.y += (-0.2 - gunModel.position.y) * 0.1;
+    }
+}
+
+// Add these variables at the top of renderer.js
+let tracerGroup = new THREE.Group();
+let muzzleFlash = null;
+let tracerTimeout = null;
+
+export function spawnBulletTracer(startPos, endPos, hitNormal, isHit, hitPoint) {
+    // 1. Create a thin cylinder for the laser beam (easier to see than a Line)
+    const distance = startPos.distanceTo(endPos);
+    const geometry = new THREE.CylinderGeometry(0.015, 0.015, distance, 4);
+    // Rotate the cylinder so it points from start to end
+    geometry.translate(0, distance / 2, 0);
+
+    const material = new THREE.MeshBasicMaterial({ color: 0xffff00 });
+    const beam = new THREE.Mesh(geometry, material);
+
+    beam.position.copy(startPos);
+    beam.lookAt(endPos);
+    tracerGroup.add(beam);
+
+    // 2. Muzzle Flash
+    if (!muzzleFlash) {
+        muzzleFlash = new THREE.PointLight(0xffaa00, 5, 5);
+        muzzleFlash.position.set(0.25, -0.2, -0.8);
+        getCamera().add(muzzleFlash);
+    }
+    muzzleFlash.visible = true;
+
+    // 3. Spawn Bullet Hole if we hit something
+    if (isHit && hitPoint && hitNormal) {
+        spawnBulletHole(hitPoint, hitNormal);
+    }
+
+    // 4. Cleanup the laser beam after 50ms
+    clearTimeout(tracerTimeout);
+    tracerTimeout = setTimeout(() => {
+        tracerGroup.remove(beam);
+        geometry.dispose();
+        material.dispose();
+        if (muzzleFlash) muzzleFlash.visible = false;
+    }, 50);
+}
+
+function spawnBulletHole(position, normal) {
+    const mat = new THREE.MeshBasicMaterial({
+        map: bulletHoleTexture,
+        transparent: true,
+        depthWrite: false, // Prevents z-fighting
+        polygonOffset: true, // Pushes the decal slightly forward
+        polygonOffsetFactor: -1
+    });
+
+    const geo = new THREE.PlaneGeometry(0.4, 0.4);
+    const hole = new THREE.Mesh(geo, mat);
+
+    // Position slightly off the wall to prevent flickering
+    hole.position.copy(position).add(normal.clone().multiplyScalar(0.01));
+
+    // Align the hole to face the normal of the wall
+    hole.lookAt(position.clone().add(normal));
+
+    scene.add(hole);
+    bulletHoles.push(hole);
+
+    // Remove oldest bullet hole if we hit the limit
+    if (bulletHoles.length > MAX_BULLET_HOLES) {
+        const oldHole = bulletHoles.shift();
+        scene.remove(oldHole);
+        oldHole.geometry.dispose();
+        oldHole.material.dispose();
     }
 }
 

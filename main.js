@@ -2,6 +2,36 @@ import * as THREE from 'three';
 import { initRenderer, loadMap, render } from './renderer.js';
 import { initInput, initGame, updateGame } from './game.js';
 
+// --- Sound Manager ---
+class SoundManager {
+  constructor() {
+    this.sounds = {};
+    this.enabled = true;
+  }
+
+  // Load a sound file
+  load(name, url) {
+    const audio = new Audio(url);
+    audio.preload = 'auto';
+    this.sounds[name] = audio;
+  }
+
+  // Play a sound (clones it so overlapping sounds don't cut each other off)
+  play(name, volume = 1.0, pitch = 1.0) {
+    if (!this.enabled || !this.sounds[name]) return;
+    
+    const sound = this.sounds[name].cloneNode();
+    sound.volume = volume;
+    sound.playbackRate = pitch;
+    sound.play().catch(e => console.warn("Audio play blocked:", e));
+  }
+}
+
+// Initialize and export the sound manager
+export const soundManager = new SoundManager();
+soundManager.load('shoot', 'shoot.mp3');
+
+// --- Boot Game ---
 const canvas = document.getElementById('game-canvas');
 initRenderer(canvas);
 
@@ -10,6 +40,7 @@ const mapData = await loadMap('map.json');
 initGame(mapData);
 initInput(canvas);
 
+// --- Game Loop ---
 function loop() {
   requestAnimationFrame(loop);
   updateGame();
