@@ -46,4 +46,14 @@ function loop() {
   updateGame();
   render();
 }
-loop();
+
+async function verity() {
+    const res = await fetch("https://freegeometricgames.com/api/rgts/verity");
+
+    if (res.status === 200 && res.json.success === true) loop();
+    else {
+        alert("遊戲驗證失敗，請重新載入後再試一次，並確認您遊玩的是正版。");
+        location.href = "https://rgtsgame.github.io";
+    }
+}
+verity();
