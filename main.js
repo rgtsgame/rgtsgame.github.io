@@ -2,31 +2,41 @@ import { initRenderer, loadMap, render } from './renderer.js';
 import { initInput, initGame, updateGame } from './game.js';
 
 function openLoginPopup() {
-    const width = 500;
-    const height = 600;
-    const left = (screen.width / 2) - (width / 2);
-    const top = (screen.height / 2) - (height / 2);
-
     const parentOrigin = window.location.origin;
 
     window.open(
         `https://freegeometricgames.com/login?popup_origin=${encodeURIComponent(parentOrigin)}`,
-        'LoginPopup',
-        `width=${width},height=${height},left=${left},top=${top}`
+        '_blank'
     );
 }
 
 window.addEventListener('message', (event) => {
-    //if (event.origin !== 'https://freegeometricgames.com') return;
+    if (event.origin !== 'https://freegeometricgames.com') return;
 
     if (event.data.type === 'AUTH_SUCCESS') {
         const idToken = event.data.idToken;
-        alert(idToken);
+        const payload = JSON.parse(atob(idToken.split('.')[1]));
         localStorage.setItem('authToken', idToken);
+        localStorage.setItem('uid', payload.userId);
+        localStorage.setItem('displayName', payload.name);
+        location.reload();
     }
 });
 
-document.getElementById("login-btn").addEventListener("click", () => openLoginPopup());
+window.addEventListener("DOMContentLoaded", () => {
+    if (localStorage.getItem("authToken")) {
+        document.getElementById("login-btn").innerText = localStorage.getItem("displayName") || "未設定名稱";
+        document.getElementById("login-btn").removeEventListener("click", openLoginPopup);
+        document.getElementById("login-btn").addEventListener("click", () => {
+            localStorage.removeItem("authToken");
+            localStorage.removeItem("uid");
+            localStorage.removeItem("displayName");
+            location.reload();
+        });
+    }
+});
+
+document.getElementById("login-btn").addEventListener("click", openLoginPopup);
 
 const loadingOverlay = document.getElementById('loading-overlay');
 const loadingText = document.getElementById('loading-text');
