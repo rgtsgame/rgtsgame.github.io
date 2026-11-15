@@ -176,7 +176,7 @@ export function initGame(mapData) {
         else spawnPos.set(sp.position.x, sp.position.y, sp.position.z);
     }
 
-    localPlayer = { position: spawnPos, velocityY: 0, onGround: false };
+    localPlayer = { position: spawnPos, velocityY: 0, onGround: false, alive: true };
 
     for (let i = 0; i < 5; i++) {
         const id = "npc_" + i;
@@ -413,7 +413,7 @@ export function updateGame() {
 
         // Update Mesh
         mesh.position.copy(npc.position);
-        
+
         // Rotate to face movement direction
         if (npc.targetDir.lengthSq() > 0) {
             const angle = Math.atan2(npc.targetDir.x, npc.targetDir.z);
@@ -449,3 +449,46 @@ export function updateGame() {
 export function getYaw() { return yaw; }
 export function getPitch() { return pitch; }
 export function getLocalPlayer() { return localPlayer; }
+
+export function onServerJoined(serverId) {
+    console.log("[game] server assigned id:", serverId);
+}
+
+export function onHitConfirmed(targetId, dmg, isKill) {
+    // Hitmarker already shown optimistically in shoot()
+    // Nothing extra required — placeholder for future sounds/killfeeds
+}
+
+export function onLocalHealth(newHealth) {
+    // Import hud lazily to avoid circular dep
+    import('./main.js').then(m => {
+        m.hud?.setHealth(newHealth);
+        m.hud?.flashDamage();
+    });
+}
+
+export function onLocalDeath() {
+    if (!localPlayer) return;
+    localPlayer.alive = false;
+    document.exitPointerLock();
+    import('./main.js').then(m => {
+        m.hud?.showDeathOverlay(5);
+        m.soundManager?.play('death', 0.8, 1.0);
+    });
+}
+
+export function onLocalRespawn(x, y, z) {
+    if (!localPlayer) return;
+    localPlayer.position.set(x, y, z);
+    localPlayer.velocityY = 0;
+    localPlayer.onGround = false;
+    localPlayer.alive = true;
+
+    const cam = getCamera();
+    cam.position.copy(localPlayer.position);
+
+    import('./main.js').then(m => {
+        m.hud?.hideDeathOverlay();
+        m.hud?.setHealth(100);
+    });
+}

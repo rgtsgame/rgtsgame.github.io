@@ -9,7 +9,16 @@ const bulletHoleTexture = new THREE.TextureLoader().load('bullet_hole.png');
 const bulletHoles = [];
 const MAX_BULLET_HOLES = 50;
 
-// Generates a small grass texture using HTML Canvas
+const PLAYER_HEIGHT = 1.7;
+
+// ============================================================
+// REMOTE PLAYERS
+// ============================================================
+const remotePlayers = new Map();   // id -> { mesh, nameTag, targetPos, targetYaw, alive }
+
+// ============================================================
+// TEXTURES
+// ============================================================
 function createGrassTexture() {
     const canvas = document.createElement('canvas');
     canvas.width = 64;
@@ -35,6 +44,29 @@ function createGrassTexture() {
     return texture;
 }
 
+function makeNameTagSprite(name) {
+    const canvas = document.createElement('canvas');
+    canvas.width = 256;
+    canvas.height = 64;
+    const ctx = canvas.getContext('2d');
+    ctx.fillStyle = 'rgba(0,0,0,0.5)';
+    ctx.fillRect(0, 0, 256, 64);
+    ctx.font = 'bold 32px sans-serif';
+    ctx.fillStyle = '#fff';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(String(name).substring(0, 16), 128, 32);
+
+    const tex = new THREE.CanvasTexture(canvas);
+    const sprite = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, depthTest: false }));
+    sprite.scale.set(2, 0.5, 1);
+    sprite.position.set(0, 2.2, 0);
+    return sprite;
+}
+
+// ============================================================
+// INIT
+// ============================================================
 export function initRenderer(canvas) {
     scene = new THREE.Scene();
     const skyColor = 0x87CEEB;
@@ -68,6 +100,9 @@ export function initRenderer(canvas) {
     sun.shadow.camera.bottom = -60;
     scene.add(sun);
 
+    // Tracer group — add to scene so remote tracers render
+    scene.add(tracerGroup);
+
     createGun();
 
     addEventListener('resize', () => {
@@ -94,29 +129,28 @@ function createGun() {
     camera.add(gunModel);
 }
 
+// ============================================================
+// NPC MESHES
+// ============================================================
 export const npcMeshes = [];
 
 export function spawnNPCMesh(id, position) {
-    // Create a simple blocky character
     const group = new THREE.Group();
     group.position.set(position[0], position[1], position[2]);
 
     const bodyMat = new THREE.MeshStandardMaterial({ color: 0xff2222 });
     const headMat = new THREE.MeshStandardMaterial({ color: 0xffccaa });
 
-    // Torso
     const body = new THREE.Mesh(new THREE.BoxGeometry(0.8, 1.2, 0.4), bodyMat);
     body.position.y = 1.0;
     body.castShadow = true;
     group.add(body);
 
-    // Head
     const head = new THREE.Mesh(new THREE.BoxGeometry(0.4, 0.4, 0.4), headMat);
     head.position.y = 1.8;
     head.castShadow = true;
     group.add(head);
 
-    // Arms
     const armL = new THREE.Mesh(new THREE.BoxGeometry(0.25, 1, 0.25), bodyMat);
     armL.position.set(-0.55, 1.0, 0);
     armL.castShadow = true;
@@ -144,18 +178,148 @@ export function removeNPCMesh(id) {
 export function flashNPC(id) {
     const npc = npcMeshes.find(n => n.userData.id === id);
     if (npc && !npc.userData.isDead) {
-        npc.userData.bodyMesh.material.color.setHex(0xffffff); // Flash white
+        npc.userData.bodyMesh.material.color.setHex(0xffffff);
         setTimeout(() => {
             if (!npc.userData.isDead) npc.userData.bodyMesh.material.color.setHex(0xff2222);
         }, 100);
     }
 }
 
+// ============================================================
+// REMOTE PLAYERS — public API
+// ============================================================
+
+export function spawnRemotePlayer(id, name = 'player') {
+    if (remotePlayers.has(id)) return;
+
+    const group = new THREE.Group();
+    group.position.set(0, 0, 0);
+
+    // Same blocky style as NPCs, different color
+    const bodyMat = new THREE.MeshStandardMaterial({ color: 0x3498db });
+    const headMat = new THREE.MeshStandardMaterial({ color: 0xffccaa });
+
+    const body = new THREE.Mesh(new THREE.BoxGeometry(0.8, 1.2, 0.4), bodyMat);
+    body.position.y = 1.0;
+    body.castShadow = true;
+    group.add(body);
+
+    const head = new THREE.Mesh(new THREE.BoxGeometry(0.4, 0.4, 0.4), headMat);
+    head.position.y = 1.8;
+    head.castShadow = true;
+    group.add(head);
+
+    const armL = new THREE.Mesh(new THREE.BoxGeometry(0.25, 1, 0.25), bodyMat);
+    armL.position.set(-0.55, 1.0, 0);
+    armL.castShadow = true;
+    group.add(armL);
+
+    const armR = new THREE.Mesh(new THREE.BoxGeometry(0.25, 1, 0.25), bodyMat);
+    armR.position.set(0.55, 1.0, 0);
+    armR.castShadow = true;
+    group.add(armR);
+
+    // Mark for raycast resolution
+    group.userData = { type: 'remotePlayer', id: id, bodyMesh: body };
+    body.userData.remoteId = id;   // fast lookup from raycast hit
+
+    // Name tag
+    const nameTag = makeNameTagSprite(name);
+    group.add(nameTag);
+
+    scene.add(group);
+
+    remotePlayers.set(id, {
+        id,
+        name,
+        mesh: group,
+        nameTag,
+        targetPos: new THREE.Vector3(0, 0, 0),
+        targetYaw: 0,
+        alive: true,
+    });
+
+    return group;
+}
+
+export function removeRemotePlayer(id) {
+    const rp = remotePlayers.get(id);
+    if (!rp) return;
+    scene.remove(rp.mesh);
+    rp.mesh.traverse(obj => {
+        if (obj.geometry) obj.geometry.dispose();
+        if (obj.material) obj.material.dispose();
+    });
+    remotePlayers.delete(id);
+}
+
+export function updateRemotePlayer(id, x, y, z, rx, ry) {
+    const rp = remotePlayers.get(id);
+    if (!rp) return;
+    // Server sends eye height; mesh origin is at feet
+    rp.targetPos.set(x, y - PLAYER_HEIGHT, z);
+    rp.targetYaw = ry;
+}
+
+export function hideRemotePlayer(id) {
+    const rp = remotePlayers.get(id);
+    if (!rp) return;
+    rp.alive = false;
+    rp.mesh.visible = false;
+}
+
+export function showRemotePlayer(id, x, y, z) {
+    const rp = remotePlayers.get(id);
+    if (!rp) return;
+    rp.alive = true;
+    rp.mesh.visible = true;
+    rp.mesh.position.set(x, y - PLAYER_HEIGHT, z);   // ← subtract here too
+    rp.targetPos.set(x, y - PLAYER_HEIGHT, z);
+}
+
+// Returns visible remote player meshes for raycasting
+export function getRemotePlayerMeshes() {
+    const out = [];
+    remotePlayers.forEach(rp => {
+        if (rp.alive) out.push(rp.mesh);
+    });
+    return out;
+}
+
+// Walk up parent chain from a raycast hit to find the remote player id
+export function findRemoteIdByObject(obj) {
+    let cur = obj;
+    while (cur) {
+        if (cur.userData && cur.userData.remoteId) return cur.userData.remoteId;
+        if (cur.userData && cur.userData.type === 'remotePlayer') return cur.userData.id;
+        cur = cur.parent;
+    }
+    return null;
+}
+
+// Per-frame interpolation — call from main loop
+export function updateRemotePlayers(dt) {
+    const lerp = 1 - Math.pow(0.001, dt);
+    remotePlayers.forEach(rp => {
+        if (!rp.alive) return;
+
+        rp.mesh.position.lerp(rp.targetPos, lerp);
+
+        // Smooth yaw rotation (wrap-around safe)
+        let dy = rp.targetYaw - rp.mesh.rotation.y;
+        while (dy > Math.PI) dy -= Math.PI * 2;
+        while (dy < -Math.PI) dy += Math.PI * 2;
+        rp.mesh.rotation.y += dy * lerp;
+    });
+}
+
+// ============================================================
+// MAP LOADING
+// ============================================================
 export async function loadMap(url) {
     const res = await fetch(url);
     const data = await res.json();
 
-    // Clear previous meshes if loading a new map
     loadedMeshes.forEach(m => scene.remove(m));
     loadedMeshes = [];
 
@@ -176,17 +340,12 @@ export async function loadMap(url) {
 
         const mesh = new THREE.Mesh(geo, mat);
         mesh.position.set(m.position[0], m.position[1], m.position[2]);
-
-        // Apply full 3D rotation (X, Y, Z)
         mesh.rotation.set(m.rotation[0] || 0, m.rotation[1] || 0, m.rotation[2] || 0);
-
         mesh.castShadow = true;
         mesh.receiveShadow = true;
-
         mesh.userData.id = m.id;
         mesh.userData.collidable = m.collidable;
         mesh.userData.originalData = m;
-
         scene.add(mesh);
         loadedMeshes.push(mesh);
     }
@@ -227,7 +386,6 @@ export function toggleHitboxes(colliders) {
         const w = c.max.x - c.min.x;
         const h = c.max.y - c.min.y;
         const d = c.max.z - c.min.z;
-
         const cx = c.min.x + w / 2;
         const cy = c.min.y + h / 2;
         const cz = c.min.z + d / 2;
@@ -235,7 +393,6 @@ export function toggleHitboxes(colliders) {
         const geo = new THREE.BoxGeometry(w, h, d);
         const edges = new THREE.EdgesGeometry(geo);
         const line = new THREE.LineSegments(edges, debugMat);
-
         line.position.set(cx, cy, cz);
         debugHitboxesGroup.add(line);
     }
@@ -254,26 +411,23 @@ export function updateViewModel(time, isMoving) {
     }
 }
 
-// Add these variables at the top of renderer.js
+// ============================================================
+// TRACERS
+// ============================================================
 let tracerGroup = new THREE.Group();
 let muzzleFlash = null;
-let tracerTimeout = null;
+const activeTracers = [];   // { mesh, geo, mat, expireAt }
 
 export function spawnBulletTracer(startPos, endPos, hitNormal, isHit, hitPoint) {
-    // 1. Create a thin cylinder for the laser beam (easier to see than a Line)
     const distance = startPos.distanceTo(endPos);
+    if (distance < 0.01) return;   // degenerate
+
     const geometry = new THREE.CylinderGeometry(0.015, 0.015, distance, 4);
-    // Rotate the cylinder so it points from start to end
     geometry.translate(0, distance / 2, 0);
 
     const material = new THREE.MeshBasicMaterial({ color: 0xffff00 });
-    const beam = new THREE.Mesh(geometry, material);
 
-    beam.position.copy(startPos);
-    beam.lookAt(endPos);
-    tracerGroup.add(beam);
-
-    // 2. Muzzle Flash
+    // Muzzle flash — only for the local player's own gun
     if (!muzzleFlash) {
         muzzleFlash = new THREE.PointLight(0xffaa00, 5, 5);
         muzzleFlash.position.set(0.25, -0.2, -0.8);
@@ -281,43 +435,44 @@ export function spawnBulletTracer(startPos, endPos, hitNormal, isHit, hitPoint) 
     }
     muzzleFlash.visible = true;
 
-    // 3. Spawn Bullet Hole if we hit something
     if (isHit && hitPoint && hitNormal) {
         spawnBulletHole(hitPoint, hitNormal);
     }
 
-    // 4. Cleanup the laser beam after 50ms
-    clearTimeout(tracerTimeout);
-    tracerTimeout = setTimeout(() => {
-        tracerGroup.remove(beam);
-        geometry.dispose();
-        material.dispose();
+    setTimeout(() => {
         if (muzzleFlash) muzzleFlash.visible = false;
     }, 50);
+}
+
+// Remote tracer — no muzzle flash, no bullet hole on our side
+export function spawnRemoteTracer(ox, oy, oz, dx, dy, dz) {
+    const start = new THREE.Vector3(ox, oy, oz);
+    const dir = new THREE.Vector3(dx, dy, dz);
+    if (dir.lengthSq() < 1e-6) return;
+    dir.normalize();
+    const end = start.clone().add(dir.multiplyScalar(100));
+
+    spawnBulletTracer(start, end, null, false, null);
 }
 
 function spawnBulletHole(position, normal) {
     const mat = new THREE.MeshBasicMaterial({
         map: bulletHoleTexture,
         transparent: true,
-        depthWrite: false, // Prevents z-fighting
-        polygonOffset: true, // Pushes the decal slightly forward
+        depthWrite: false,
+        polygonOffset: true,
         polygonOffsetFactor: -1
     });
 
     const geo = new THREE.PlaneGeometry(0.4, 0.4);
     const hole = new THREE.Mesh(geo, mat);
 
-    // Position slightly off the wall to prevent flickering
     hole.position.copy(position).add(normal.clone().multiplyScalar(0.01));
-
-    // Align the hole to face the normal of the wall
     hole.lookAt(position.clone().add(normal));
 
     scene.add(hole);
     bulletHoles.push(hole);
 
-    // Remove oldest bullet hole if we hit the limit
     if (bulletHoles.length > MAX_BULLET_HOLES) {
         const oldHole = bulletHoles.shift();
         scene.remove(oldHole);
@@ -326,10 +481,28 @@ function spawnBulletHole(position, normal) {
     }
 }
 
+// Call each frame to clean up expired tracers
+function cleanupTracers() {
+    const now = performance.now();
+    for (let i = activeTracers.length - 1; i >= 0; i--) {
+        if (now >= activeTracers[i].expireAt) {
+            const t = activeTracers[i];
+            tracerGroup.remove(t.mesh);
+            t.geo.dispose();
+            t.mat.dispose();
+            activeTracers.splice(i, 1);
+        }
+    }
+}
+
+// ============================================================
+// ACCESSORS + RENDER
+// ============================================================
 export function getScene() { return scene; }
 export function getCamera() { return camera; }
 export function getClock() { return clock; }
 
 export function render() {
+    cleanupTracers();
     renderer.render(scene, camera);
 }

@@ -181,6 +181,7 @@ body {
     flex-direction: column;
     gap: 20px;
     width: 350px;
+    margin-top: 10px;
 }
 
 .promo-box {
@@ -241,7 +242,22 @@ body {
 .server-status h2 {
     color: #28a745;
     font-size: 22px;
-    margin: 5px 0;
+    margin-top: 5px;
+    margin-bottom: 15px;
+}
+
+.pinging:before {
+    display: inline-block;
+    width: 15px;
+    height: 15px;
+    border: 2px solid #333;
+    border-top-color: #ed8e18;
+    border-radius: 50%;
+    animation: spin 0.6s linear infinite;
+    margin-right: 7.5px;
+    position: relative;
+    top: 2px;
+    content: "";
 }
 
 .server-status p {
@@ -338,4 +354,127 @@ button {
 #loading-text {
     color: #ed8e18;
     font-weight: bold;
+}
+
+#hud {
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    font-family: sans-serif;
+    z-index: 10;
+}
+
+#hud.hidden {
+    display: none;
+}
+
+#hitmarker {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%) scale(1);
+    color: #fff;
+    font-size: 36px;
+    text-shadow: 0 0 4px red;
+    opacity: 0;
+}
+
+#hitmarker.show {
+    animation: hitFlash 0.18s ease-out;
+}
+
+@keyframes hitFlash {
+    0% {
+        opacity: 1;
+        transform: translate(-50%, -50%) scale(1.4);
+    }
+
+    100% {
+        opacity: 0;
+        transform: translate(-50%, -50%) scale(1.0);
+    }
+}
+
+#hp-bar {
+    position: absolute;
+    left: 24px;
+    bottom: 24px;
+    color: #fff;
+    font-size: 22px;
+    font-weight: bold;
+    text-shadow: 0 0 4px #000;
+}
+
+#killfeed {
+    position: absolute;
+    right: 24px;
+    top: 24px;
+    color: #fff;
+    font-size: 14px;
+    text-align: right;
+    text-shadow: 0 0 3px #000;
+}
+
+#death-overlay {
+    position: absolute;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.7);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    color: #fff;
+}
+
+#death-overlay.hidden {
+    display: none;
+}
+
+#death-overlay h1 {
+    font-size: 64px;
+    margin: 0;
+}
+
+#death-overlay p {
+    font-size: 20px;
+}
+
+#scoreboard {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    background: rgba(0, 0, 0, 0.85);
+    padding: 16px 24px;
+    color: #fff;
+    min-width: 320px;
+    border-radius: 8px;
+}
+
+#scoreboard.hidden {
+    display: none;
+}
+
+#scoreboard table {
+    width: 100%;
+    border-collapse: collapse;
+}
+
+#scoreboard th,
+#scoreboard td {
+    padding: 6px 12px;
+    text-align: left;
+    border-bottom: 1px solid #333;
+}
+
+#damage-flash {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    box-shadow: inset 0 0 0 0 rgba(255, 0, 0, 0);
+    transition: box-shadow 0.15s;
+}
+
+#damage-flash.flash {
+    box-shadow: inset 0 0 120px 40px rgba(255, 0, 0, 0.6);
 }
