@@ -1,5 +1,8 @@
 import { initRenderer, loadMap, render } from './renderer.js';
 import { initInput, initGame, updateGame } from './game.js';
+import { SyncManager } from './syncManager.js';
+
+const syncManager = new SyncManager();
 
 function openLoginPopup() {
     const parentOrigin = window.location.origin;
@@ -40,6 +43,9 @@ document.getElementById("login-btn").addEventListener("click", openLoginPopup);
 
 const loadingOverlay = document.getElementById('loading-overlay');
 const loadingText = document.getElementById('loading-text');
+const menuContainer = document.getElementById('menu-container');
+const playBtn = document.getElementById('btn-play');
+const serverStatusText = document.querySelector('.server-status h2');
 
 class SoundManager {
     constructor() {
@@ -69,12 +75,27 @@ soundManager.load('shoot', 'shoot.mp3');
 const canvas = document.getElementById('game-canvas');
 initRenderer(canvas);
 
+let isGameActive = false;
+let mapData = null;
+
 async function boot() {
     if (!await verity()) return;
 
     loadingText.innerText = "正在載入地圖...";
 
     const mapData = await loadMap('map.json');
+
+    loadingText.innerText = "正在尋找伺服器...";
+    await syncManager.fetchServerUrl();
+    
+    loadingText.innerText = "正在連線至伺服器...";
+    const ping = await syncManager.pingServer();
+
+    if (ping !== null) {
+        serverStatusText.innerHTML = `伺服器在線<br><span style="color: #4CAF50; font-size: 16px;">延遲: ${ping}ms</span>`;
+    } else {
+        serverStatusText.innerHTML = `<span style="color: #F44336;">伺服器已離線</span>`;
+    }
 
     loadingText.innerText = "遊戲準備中...";
 
