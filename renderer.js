@@ -195,7 +195,6 @@ export function spawnRemotePlayer(id, name = 'player') {
     const group = new THREE.Group();
     group.position.set(0, 0, 0);
 
-    // Same blocky style as NPCs, different color
     const bodyMat = new THREE.MeshStandardMaterial({ color: 0x3498db });
     const headMat = new THREE.MeshStandardMaterial({ color: 0xffccaa });
 
@@ -219,38 +218,116 @@ export function spawnRemotePlayer(id, name = 'player') {
     armR.castShadow = true;
     group.add(armR);
 
-    // Mark for raycast resolution
     group.userData = { type: 'remotePlayer', id: id, bodyMesh: body };
-    body.userData.remoteId = id;   // fast lookup from raycast hit
+    body.userData.remoteId = id;
 
-    // Name tag
     const nameTag = makeNameTagSprite(name);
     group.add(nameTag);
 
     scene.add(group);
 
+    // Health bar lives in scene root — not parented to the rotating group
+    const healthBar = makeHealthBar();
+    healthBar.group.position.set(0, 0, 0);
+    scene.add(healthBar.group);
+
     remotePlayers.set(id, {
-        id,
-        name,
+        id, name,
         mesh: group,
         nameTag,
+        healthBar,
+        bodyMat,
         targetPos: new THREE.Vector3(0, 0, 0),
         targetYaw: 0,
+        targetHealth: 100,
         alive: true,
     });
 
     return group;
 }
 
+function makeHealthBar() {
+    const bgGeo = new THREE.PlaneGeometry(1.0, 0.12);
+    const bgMat = new THREE.MeshBasicMaterial({ color: 0x000000, depthTest: false });
+    const bg = new THREE.Mesh(bgGeo, bgMat);
+
+    const fillGeo = new THREE.PlaneGeometry(1.0, 0.10);
+    const fillMat = new THREE.MeshBasicMaterial({ color: 0x2ecc71, depthTest: false });
+    const fill = new THREE.Mesh(fillGeo, fillMat);
+    fill.position.z = 0.001;   // avoid z-fighting with bg
+
+    const group = new THREE.Group();
+    group.add(bg);
+    group.add(fill);
+
+    return {
+        group,
+        fill,
+        bg,
+        setHealth(h) {
+            const pct = Math.max(0, Math.min(1, h / 100));
+            fill.scale.x = pct;
+            // Keep the left edge anchored while scaling
+            fill.position.x = -(1 - pct) * 0.5;
+            // Color: green → yellow → red
+            const color = pct > 0.5
+                ? new THREE.Color(0xff4444).lerp(new THREE.Color(0x2ecc71), (pct - 0.5) * 2)
+                : new THREE.Color(0xff4444).lerp(new THREE.Color(0xffaa00), pct * 2);
+            fill.material.color.copy(color);
+        },
+        dispose() {
+            bgGeo.dispose(); bgMat.dispose();
+            fillGeo.dispose(); fillMat.dispose();
+        },
+    };
+}
+
 export function removeRemotePlayer(id) {
     const rp = remotePlayers.get(id);
     if (!rp) return;
+
     scene.remove(rp.mesh);
     rp.mesh.traverse(obj => {
         if (obj.geometry) obj.geometry.dispose();
         if (obj.material) obj.material.dispose();
     });
+
+    if (rp.healthBar) {
+        scene.remove(rp.healthBar.group);
+        rp.healthBar.dispose();
+    }
+
     remotePlayers.delete(id);
+}
+
+export function updateRemotePlayers(dt) {
+    const lerp = 1 - Math.pow(0.001, dt);
+    const cam = camera;
+
+    remotePlayers.forEach(rp => {
+        if (!rp.alive) {
+            rp.healthBar.group.visible = false;
+            return;
+        }
+        rp.healthBar.group.visible = true;
+
+        rp.mesh.position.lerp(rp.targetPos, lerp);
+
+        let dy = rp.targetYaw - rp.mesh.rotation.y;
+        while (dy > Math.PI) dy -= Math.PI * 2;
+        while (dy < -Math.PI) dy += Math.PI * 2;
+        rp.mesh.rotation.y += dy * lerp;
+
+        // Health bar: follow mesh position, float above head, face camera
+        rp.healthBar.group.position.set(
+            rp.mesh.position.x,
+            rp.mesh.position.y + 2.5,
+            rp.mesh.position.z
+        );
+        if (cam) {
+            rp.healthBar.group.quaternion.copy(cam.quaternion);
+        }
+    });
 }
 
 export function updateRemotePlayer(id, x, y, z, rx, ry) {
@@ -266,6 +343,7 @@ export function hideRemotePlayer(id) {
     if (!rp) return;
     rp.alive = false;
     rp.mesh.visible = false;
+    if (rp.healthBar) rp.healthBar.group.visible = false;
 }
 
 export function showRemotePlayer(id, x, y, z) {
@@ -273,8 +351,11 @@ export function showRemotePlayer(id, x, y, z) {
     if (!rp) return;
     rp.alive = true;
     rp.mesh.visible = true;
-    rp.mesh.position.set(x, y - PLAYER_HEIGHT, z);   // ← subtract here too
+    rp.mesh.position.set(x, y - PLAYER_HEIGHT, z);
     rp.targetPos.set(x, y - PLAYER_HEIGHT, z);
+    rp.targetHealth = 100;
+    rp.healthBar?.setHealth(100);
+    rp.healthBar.group.visible = true;
 }
 
 // Returns visible remote player meshes for raycasting
@@ -297,20 +378,22 @@ export function findRemoteIdByObject(obj) {
     return null;
 }
 
-// Per-frame interpolation — call from main loop
-export function updateRemotePlayers(dt) {
-    const lerp = 1 - Math.pow(0.001, dt);
-    remotePlayers.forEach(rp => {
-        if (!rp.alive) return;
+export function setRemotePlayerHealth(id, health) {
+    const rp = remotePlayers.get(id);
+    if (!rp) return;
+    rp.targetHealth = health;
+    rp.healthBar?.setHealth(health);
+    flashRemotePlayer(id);
+}
 
-        rp.mesh.position.lerp(rp.targetPos, lerp);
-
-        // Smooth yaw rotation (wrap-around safe)
-        let dy = rp.targetYaw - rp.mesh.rotation.y;
-        while (dy > Math.PI) dy -= Math.PI * 2;
-        while (dy < -Math.PI) dy += Math.PI * 2;
-        rp.mesh.rotation.y += dy * lerp;
-    });
+export function flashRemotePlayer(id) {
+    const rp = remotePlayers.get(id);
+    if (!rp) return;
+    rp.bodyMat.color.setHex(0xffffff);
+    clearTimeout(rp._flashTimer);
+    rp._flashTimer = setTimeout(() => {
+        if (rp.alive) rp.bodyMat.color.setHex(0x3498db);
+    }, 100);
 }
 
 // ============================================================

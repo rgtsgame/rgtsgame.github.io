@@ -1,9 +1,10 @@
 import * as THREE from 'three';
 import {
     getCamera, getClock, toggleHitboxes, getLoadedMeshes,
-    spawnBulletTracer, spawnNPCMesh, removeNPCMesh, flashNPC, npcMeshes
+    spawnBulletTracer,
+    getRemotePlayerMeshes, findRemoteIdByObject
 } from './renderer.js';
-import { soundManager } from './main.js';
+import { soundManager, syncManager } from './main.js';
 
 const keys = {};
 const direction = new THREE.Vector3();
@@ -29,10 +30,6 @@ const GUN_RANGE = 100;
 let shakeIntensity = 0;
 const SHAKE_DECAY = 15;
 const SHAKE_STRENGTH = 0.5;
-
-let npcs = [];
-const NPC_SPEED = 3;
-const NPC_HEALTH = 100;
 
 const raycaster = new THREE.Raycaster();
 const downVector = new THREE.Vector3(0, -1, 0);
@@ -60,86 +57,51 @@ export function initInput(canvas) {
 
 function shoot() {
     const now = performance.now();
-    if (now - lastShootTime < FIRE_RATE) return; // Fire rate cooldown
+    if (now - lastShootTime < FIRE_RATE) return;
     lastShootTime = now;
-
     shakeIntensity = 0.5;
 
     const randomPitch = 0.95 + Math.random() * 0.1;
     soundManager.play('shoot', 0.8, randomPitch);
 
     const camera = getCamera();
-
-    // 1. Setup Raycaster from the center of the screen
     const shootRaycaster = new THREE.Raycaster();
     shootRaycaster.setFromCamera(new THREE.Vector2(0, 0), camera);
     shootRaycaster.far = GUN_RANGE;
 
     const hitsMap = shootRaycaster.intersectObjects(collidableMeshes, false);
+    const hitsRemote = shootRaycaster.intersectObjects(getRemotePlayerMeshes(), true);
 
-    const hitsNPC = shootRaycaster.intersectObjects(npcMeshes, true);
+    const wallDist = hitsMap.length ? hitsMap[0].distance : Infinity;
+    const remDist = hitsRemote.length ? hitsRemote[0].distance : Infinity;
 
-    let hitPoint = null;
-    let hitNormal = null;
-    let isHit = false;
+    // Always replicate the shot so other clients see the tracer
+    const dir = camera.getWorldDirection(new THREE.Vector3());
+    const gunOffset = new THREE.Vector3(0.2, -0.2, -0.5).applyMatrix4(camera.matrixWorld);
+    syncManager?.sendShoot(gunOffset, dir);
 
+    // Priority: remote player if closer than wall
+    if (remDist < wallDist) {
+        const remoteId = findRemoteIdByObject(hitsRemote[0].object);
+        if (remoteId) {
+            const dmg = 25;
+            syncManager?.sendHit(remoteId, dmg, hitsRemote[0].point);
+            import('./main.js').then(m => m.hud?.showHitmarker());
+            spawnBulletTracer(gunOffset, hitsRemote[0].point, null, true, null);
+            return;
+        }
+    }
+
+    // Wall / miss
+    let hitPoint, hitNormal = null, isHit = false;
     if (hitsMap.length > 0) {
         hitPoint = hitsMap[0].point;
-        // Get the normal (the angle the wall is facing) for the bullet hole
-        hitNormal = hitsMap[0].face.normal.clone();
-
-        // Transform the normal from local box space to world space
-        hitNormal.transformDirection(hitsMap[0].object.matrixWorld);
+        hitNormal = hitsMap[0].face.normal.clone().transformDirection(hitsMap[0].object.matrixWorld);
         isHit = true;
     } else {
         hitPoint = shootRaycaster.ray.at(GUN_RANGE, new THREE.Vector3());
     }
-
-    if (hitsNPC.length > 0) {
-        const npcHit = hitsNPC[0];
-        const distanceToWall = hitsMap.length > 0 ? hitsMap[0].distance : Infinity;
-
-        if (npcHit.distance < distanceToWall) {
-            // Find the root group of the NPC
-            let npcGroup = npcHit.object;
-            while (npcGroup.parent && npcGroup.userData.type !== 'npc') {
-                npcGroup = npcGroup.parent;
-            }
-
-            if (npcGroup.userData.type === 'npc' && !npcGroup.userData.isDead) {
-                // Damage the NPC
-                const npcData = npcs.find(n => n.id === npcGroup.userData.id);
-                if (npcData) {
-                    npcData.health -= 34; // 3 shots to kill
-                    flashNPC(npcData.id);
-
-                    if (npcData.health <= 0) {
-                        npcGroup.userData.isDead = true;
-                        npcData.timer = 3; // Respawn timer
-
-                        // Hide the mesh and disable collision
-                        npcGroup.visible = false;
-                    }
-                }
-            }
-
-            const startPoint = camera.position.clone().add(
-                camera.getWorldDirection(new THREE.Vector3()).multiplyScalar(0.5)
-            );
-            spawnBulletTracer(startPoint, npcHit.point, null, true, null);
-            return; // Stop here, don't register wall hit
-        }
-    }
-
-    const startPoint = camera.position.clone().add(
-        camera.getWorldDirection(new THREE.Vector3()).multiplyScalar(0.5)
-    );
-
-    // Adjust start point to match the gun barrel position visually
-    const gunOffset = new THREE.Vector3(0.2, -0.2, -0.5).applyMatrix4(camera.matrixWorld);
-    startPoint.copy(gunOffset);
-
-    spawnBulletTracer(startPoint, hitPoint, hitNormal, isHit, hitPoint);
+    spawnBulletTracer(gunOffset, hitPoint, hitNormal, isHit, hitPoint);
 }
 
 function buildOBB(mesh) {
@@ -177,23 +139,6 @@ export function initGame(mapData) {
     }
 
     localPlayer = { position: spawnPos, velocityY: 0, onGround: false, alive: true };
-
-    for (let i = 0; i < 5; i++) {
-        const id = "npc_" + i;
-        // Spawn them in a circle around the center
-        const x = (Math.random() - 0.5) * 20;
-        const z = (Math.random() - 0.5) * 20;
-        const startY = getGroundHeight(x, z, 10) + 1.7; // Find floor height
-
-        spawnNPCMesh(id, [x, startY - 1.7, z]); // Offset so feet are on ground
-        npcs.push({
-            id: id,
-            position: new THREE.Vector3(x, startY - 1.7, z),
-            health: NPC_HEALTH,
-            targetDir: new THREE.Vector3(1, 0, 0),
-            timer: 0
-        });
-    }
 }
 
 function getPenetration(x, z, obb, buffer = PLAYER_RADIUS) {
@@ -372,54 +317,6 @@ export function updateGame() {
     }
 
     localPlayer.position.y = nextY;
-
-    for (const npc of npcs) {
-        const mesh = npcMeshes.find(m => m.userData.id === npc.id);
-        if (!mesh) continue;
-
-        if (mesh.userData.isDead) {
-            // Handle Respawn
-            npc.timer -= dt;
-            if (npc.timer <= 0) {
-                npc.health = NPC_HEALTH;
-                mesh.userData.isDead = false;
-                mesh.visible = true;
-                // Move to a new random spot
-                npc.position.x = (Math.random() - 0.5) * 20;
-                npc.position.z = (Math.random() - 0.5) * 20;
-            }
-            continue;
-        }
-
-        // Simple wander AI
-        npc.timer -= dt;
-        if (npc.timer <= 0) {
-            // Pick a new random direction every 2 seconds
-            npc.targetDir.set(Math.random() - 0.5, 0, Math.random() - 0.5).normalize();
-            npc.timer = 2.0;
-        }
-
-        // Move NPC
-        npc.position.x += npc.targetDir.x * NPC_SPEED * dt;
-        npc.position.z += npc.targetDir.z * NPC_SPEED * dt;
-
-        // Keep them inside a 40x40 area
-        if (Math.abs(npc.position.x) > 20) npc.targetDir.x *= -1;
-        if (Math.abs(npc.position.z) > 20) npc.targetDir.z *= -1;
-
-        // Snap to floor height
-        const floorY = getGroundHeight(npc.position.x, npc.position.z, npc.position.y + 2);
-        npc.position.y = floorY;
-
-        // Update Mesh
-        mesh.position.copy(npc.position);
-
-        // Rotate to face movement direction
-        if (npc.targetDir.lengthSq() > 0) {
-            const angle = Math.atan2(npc.targetDir.x, npc.targetDir.z);
-            mesh.rotation.y = angle;
-        }
-    }
 
     if (shakeIntensity > 0) {
         shakeIntensity -= SHAKE_DECAY * dt;

@@ -1,4 +1,5 @@
 import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js/+esm';
+import { getLocalPlayer, getYaw, getPitch } from './game.js';
 
 const SUPABASE_URL = 'https://pajtakwbzhkgngfudloj.supabase.co';
 const SUPABASE_KEY = 'sb_publishable_9LpfQ4jhWRmNOA5tE31VRw_vF2_2VSy';
@@ -14,9 +15,10 @@ export class SyncManager {
         this.lastPingTime = 0;
         this.currentPing = 0;
         this.serverUrl = null;
+        this._syncCallCount = 0;
+        this._syncSendCount = 0;
     }
 
-    // Step 1: Fetch URL from Supabase
     async fetchServerUrl() {
         try {
             const { data, error } = await supabase
@@ -37,7 +39,6 @@ export class SyncManager {
         }
     }
 
-    // Step 2: Ping test for the Main Menu
     pingServer() {
         return new Promise((resolve) => {
             if (!this.serverUrl) return resolve(null);
@@ -45,8 +46,6 @@ export class SyncManager {
             const startTime = performance.now();
             try {
                 const testSocket = new WebSocket(this.serverUrl);
-
-                // If it takes longer than 3 seconds, consider it offline
                 const timeout = setTimeout(() => {
                     testSocket.close();
                     resolve(null);
@@ -55,7 +54,7 @@ export class SyncManager {
                 testSocket.onopen = () => {
                     clearTimeout(timeout);
                     const ping = Math.round(performance.now() - startTime);
-                    testSocket.close(); // Close the test socket
+                    testSocket.close();
                     resolve(ping);
                 };
 
@@ -63,21 +62,18 @@ export class SyncManager {
                     clearTimeout(timeout);
                     resolve(null);
                 };
-            }
-            catch (ex) {
+            } catch (ex) {
                 console.error(ex);
                 resolve(null);
             }
         });
     }
 
-    // Step 3: Real connection for Gameplay
     connectForGame() {
         if (!this.serverUrl) {
             console.error("No server URL available to connect.");
             return;
         }
-
         this.socket = new WebSocket(this.serverUrl);
         this.setupEvents();
     }
@@ -85,7 +81,6 @@ export class SyncManager {
     setupEvents() {
         this.socket.onopen = () => {
             console.log("Connected to game server!");
-
             this.socket.send(JSON.stringify([100, this.myId]));
 
             clearInterval(this.pingInterval);
@@ -99,11 +94,7 @@ export class SyncManager {
 
         this.socket.onmessage = (event) => {
             let data;
-            try {
-                data = JSON.parse(event.data);
-            } catch {
-                return;
-            }
+            try { data = JSON.parse(event.data); } catch { return; }
             if (!Array.isArray(data) || data.length === 0) return;
 
             const packetId = data[0];
@@ -112,20 +103,13 @@ export class SyncManager {
                 this.currentPing = Math.round(performance.now() - this.lastPingTime);
                 this.updatePingUI();
             }
-
             else if (packetId === 1) {
                 const pid = data[1];
                 if (pid === this.myId) return;
-                const x = data[2];
-                const y = data[3];
-                const z = data[4];
-                const rx = data[5];
-                const ry = data[6];
                 import('./renderer.js').then(m => {
-                    m.updateRemotePlayer(pid, x, y, z, rx, ry);
+                    m.updateRemotePlayer(pid, data[2], data[3], data[4], data[5], data[6]);
                 });
             }
-
             else if (packetId === 2) {
                 const pid = data[1];
                 if (pid === this.myId) return;
@@ -133,52 +117,28 @@ export class SyncManager {
                     m.spawnRemotePlayer(pid, data[2] || 'player');
                 });
             }
-
             else if (packetId === 3) {
-                const pid = data[1];
-                import('./renderer.js').then(m => {
-                    m.removeRemotePlayer(pid);
-                });
+                import('./renderer.js').then(m => m.removeRemotePlayer(data[1]));
             }
-
             else if (packetId === 4) {
                 const shooterId = data[1];
                 if (shooterId === this.myId) return;
-                const ox = data[2], oy = data[3], oz = data[4];
-                const dx = data[5], dy = data[6], dz = data[7];
                 import('./renderer.js').then(m => {
-                    m.spawnRemoteTracer(ox, oy, oz, dx, dy, dz);
+                    m.spawnRemoteTracer(data[2], data[3], data[4], data[5], data[6], data[7]);
                 });
-                import('./main.js').then(m => {
-                    m.soundManager?.play('shoot', 0.4, 1.0);
-                });
+                import('./main.js').then(m => m.soundManager?.play('shoot', 0.4, 1.0));
             }
-
             else if (packetId === 5) {
-                const shooterId = data[1];
-                if (shooterId !== this.myId) return;
-                const targetId = data[2];
-                const dmg = data[3];
-                const isKill = data[7];
-                import('./game.js').then(m => {
-                    m.onHitConfirmed?.(targetId, dmg, isKill);
-                });
+                if (data[1] !== this.myId) return;
+                import('./game.js').then(m => m.onHitConfirmed?.(data[2], data[3], data[7]));
             }
-
             else if (packetId === 6) {
-                const targetId = data[1];
-                if (targetId !== this.myId) return;
-                const health = data[2];
-                import('./game.js').then(m => {
-                    m.onLocalHealth?.(health);
-                });
+                if (data[1] !== this.myId) return;
+                import('./game.js').then(m => m.onLocalHealth?.(data[2]));
             }
-
             else if (packetId === 8) {
-                const pid = data[1];
-                const status = data[2];
+                const pid = data[1], status = data[2];
                 const x = data[3], y = data[4], z = data[5];
-
                 if (pid === this.myId) {
                     import('./game.js').then(m => {
                         if (status === 0) m.onLocalDeath?.();
@@ -191,13 +151,16 @@ export class SyncManager {
                     });
                 }
             }
-
             else if (packetId === 10) {
-                import('./main.js').then(m => {
-                    m.hud?.updateScoreboard(data[1]);
-                });
+                import('./main.js').then(m => m.hud?.updateScoreboard(data[1]));
             }
-
+            else if (packetId === 11) {
+                if (data[1] === this.myId) return;
+                import('./renderer.js').then(m => m.setRemotePlayerHealth(data[1], data[2]));
+            }
+            else if (packetId === 12) {
+                import('./main.js').then(m => m.hud?.addKillFeed(`${data[2]} ✖ ${data[4]}`));
+            }
             else if (packetId === 101) {
                 this.myId = data[1];
                 this.myName = data[2];
@@ -206,19 +169,11 @@ export class SyncManager {
             }
         };
 
-        this.socket.onerror = (e) => {
-            console.error("[ws] error:", e);
-        };
-
+        this.socket.onerror = (e) => console.error("[ws] error:", e);
         this.socket.onclose = (e) => {
             console.warn("[ws] closed:", e.code, e.reason);
             clearInterval(this.pingInterval);
             this.pingInterval = null;
-            const pingDisplay = document.getElementById('ping-display');
-            if (pingDisplay) {
-                pingDisplay.innerText = `Disconnected`;
-                pingDisplay.style.color = '#F44336';
-            }
         };
     }
 
@@ -231,25 +186,34 @@ export class SyncManager {
     }
 
     sync() {
+        this._syncSendCount++;
+        if (this._syncCallCount === 60) {
+            console.log("[sync] debug after 1s:",
+                "socket:", this.socket?.readyState,
+                "player:", !!getLocalPlayer());
+        }
         if (!this.socket || this.socket.readyState !== WebSocket.OPEN) return;
+
         const now = performance.now();
         if (now - this.lastSendTime < this.SEND_RATE) return;
+
+        // getLocalPlayer is imported at top — no async, no delay
+        const player = getLocalPlayer();
+        if (!player) return;   // don't burn the throttle slot
+
         this.lastSendTime = now;
 
-        import('./game.js').then(module => {
-            const player = module.getLocalPlayer();
-            if (!player) return;
-            const yaw = module.getYaw();
-            const pitch = module.getPitch?.() ?? 0;
+        const x = Math.round(player.position.x * 100) / 100;
+        const y = Math.round(player.position.y * 100) / 100;
+        const z = Math.round(player.position.z * 100) / 100;
+        const rx = Math.round((getPitch?.() ?? 0) * 100) / 100;
+        const ry = Math.round(getYaw() * 100) / 100;
 
-            const x = Math.round(player.position.x * 100) / 100;
-            const y = Math.round(player.position.y * 100) / 100;
-            const z = Math.round(player.position.z * 100) / 100;
-            const rx = Math.round(pitch * 100) / 100;
-            const ry = Math.round(yaw * 100) / 100;
-
+        try {
             this.socket.send(JSON.stringify([1, x, y, z, rx, ry]));
-        });
+        } catch (e) {
+            console.warn("[sync] send failed:", e);
+        }
     }
 
     sendShoot(origin, direction) {
