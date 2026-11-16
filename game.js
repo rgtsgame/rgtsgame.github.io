@@ -36,6 +36,12 @@ let lastShootTime = 0;
 const FIRE_RATE = 150;
 const GUN_RANGE = 100;
 
+const MAX_AMMO = 30;
+const MAX_RESERVE = 90;
+const RELOAD_TIME = 1800; //in ms
+let isReloading = false;
+let reloadStartTime = 0;
+
 let shakeIntensity = 0;
 const SHAKE_DECAY = 15;
 const SHAKE_STRENGTH = 0.5;
@@ -80,6 +86,7 @@ export function initInput(canvas) {
         keys[e.code] = true;
         if (e.code === 'KeyH') toggleHitboxes(colliders);
         if (e.code === 'KeyC') tryStartSlide();
+        if (e.code === 'KeyR') reload();
     });
     addEventListener('keyup', (e) => keys[e.code] = false);
 
@@ -389,12 +396,37 @@ function getMoveInputDirection() {
     return out;
 }
 
+function reload() {
+    if (!localPlayer || !localPlayer.alive) return;
+    if (isReloading) return;
+    if (localPlayer.ammo >= MAX_AMMO) return;
+    if (localPlayer.reserve <= 0) return;
+
+    isReloading = true;
+    reloadStartTime = performance.now();
+
+    soundManager.play('gun_reload', 0.7, 1.0);
+    import('./main.js').then(m => m.hud?.showReloading?.());
+}
+
 function shoot() {
     if (!localPlayer || !localPlayer.alive) return;
+    if (isReloading) return;
+    if (localPlayer.ammo <= 0) {
+        reload();
+        return;
+    }
+
     const now = performance.now();
     if (now - lastShootTime < FIRE_RATE) return;
     lastShootTime = now;
     shakeIntensity = 0.5;
+
+    localPlayer.ammo--;
+    import('./main.js').then(m => {
+        m.hud?.setAmmo(localPlayer.ammo, MAX_AMMO);
+        if (localPlayer.ammo === 0) m.hud?.showAmmoWarning?.();
+    });
 
     const randomPitch = 0.95 + Math.random() * 0.1;
     soundManager.play('shoot', 0.8, randomPitch);
@@ -470,7 +502,14 @@ export function initGame(mapData) {
         else spawnPos.set(sp.position.x, sp.position.y, sp.position.z);
     }
 
-    localPlayer = { position: spawnPos, velocityY: 0, onGround: false, alive: true };
+    localPlayer = {
+        position: spawnPos,
+        velocityY: 0,
+        onGround: false,
+        alive: true,
+        ammo: MAX_AMMO,
+        reserve: MAX_RESERVE,
+    };
 
     isSliding = false;
     slideTimer = 0;
@@ -584,6 +623,27 @@ export function updateGame() {
 
     const camera = getCamera();
     const dt = Math.min(getClock().getDelta(), 0.1);
+
+    if (isReloading) {
+        const progress = Math.min(1, (performance.now() - reloadStartTime) / RELOAD_TIME);
+        import('./renderer.js').then(m => m.setReloadState?.(true, progress));
+
+        if (performance.now() - reloadStartTime >= RELOAD_TIME) {
+            const needed = MAX_AMMO - localPlayer.ammo;
+            const taken = Math.min(needed, localPlayer.reserve);
+
+            localPlayer.ammo += taken;
+            localPlayer.reserve -= taken;
+            isReloading = false;
+
+            import('./renderer.js').then(m => m.setReloadState?.(false, 0));
+
+            import('./main.js').then(m => {
+                m.hud?.setAmmo(localPlayer.ammo, MAX_AMMO);
+                m.hud?.hideReloading?.();
+            });
+        }
+    }
 
     if (slideCooldownTimer > 0) {
         slideCooldownTimer -= dt;
@@ -743,6 +803,9 @@ export function onLocalHealth(newHealth) {
 export function onLocalDeath() {
     if (!localPlayer) return;
     localPlayer.alive = false;
+    isReloading = false;
+
+    import('./renderer.js').then(m => m.setReloadState?.(false, 0));   // ← ADD
 
     if (document.pointerLockElement) {
         document.exitPointerLock();
@@ -750,6 +813,7 @@ export function onLocalDeath() {
 
     import('./main.js').then(m => {
         m.hud?.showDeathOverlay(5);
+        m.hud?.hideReloading?.();
         m.soundManager?.play('death', 0.8, 1.0);
     });
 }
@@ -760,6 +824,11 @@ export function onLocalRespawn(x, y, z) {
     localPlayer.velocityY = 0;
     localPlayer.onGround = false;
     localPlayer.alive = true;
+    localPlayer.ammo = MAX_AMMO;
+    localPlayer.reserve = MAX_RESERVE;
+    isReloading = false;
+
+    import('./renderer.js').then(m => m.setReloadState?.(false, 0));   // ← ADD
 
     const cam = getCamera();
     cam.position.copy(localPlayer.position);
@@ -767,5 +836,7 @@ export function onLocalRespawn(x, y, z) {
     import('./main.js').then(m => {
         m.hud?.hideDeathOverlay();
         m.hud?.setHealth(100);
+        m.hud?.setAmmo(MAX_AMMO, MAX_AMMO);
+        m.hud?.hideReloading?.();
     });
 }

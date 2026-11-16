@@ -1,4 +1,4 @@
-import { initRenderer, loadMap, render, updateRemotePlayers } from './renderer.js';
+import { initRenderer, loadMap, render, updateRemotePlayers, updateViewModel, getCamera } from './renderer.js';
 import { initInput, initGame, updateGame } from './game.js';
 import { SyncManager } from './syncManager.js';
 import { initCharacterPreview } from './characterPreview.js';
@@ -14,6 +14,9 @@ class HUD {
         this.sbEl = document.getElementById('scoreboard');
         this.damageEl = document.getElementById('damage-flash');
         this.hudEl = document.getElementById('hud');
+        this.ammoEl     = document.getElementById('ammo-val');
+        this.reserveEl  = document.getElementById('reserve-val');
+        this.reloadHint = document.getElementById('reload-hint');
 
         document.addEventListener('keydown', e => {
             if (e.code === 'Tab') {
@@ -61,6 +64,33 @@ class HUD {
     hideDeathOverlay() {
         clearInterval(this._timer);
         this.deathOverlay?.classList.add('hidden');
+    }
+
+    setAmmo(current, max, reserve = null) {
+        if (this.ammoEl) this.ammoEl.textContent = current;
+        if (reserve !== null && this.reserveEl) {
+            this.reserveEl.textContent = reserve;
+        }
+        // Warn state when low
+        if (this.ammoEl) {
+            this.ammoEl.classList.toggle('low', current <= 5);
+        }
+    }
+
+    showReloading() {
+        if (this.reloadHint) this.reloadHint.classList.add('show');
+        if (this.ammoEl) this.ammoEl.classList.add('reloading');
+    }
+
+    hideReloading() {
+        if (this.reloadHint) this.reloadHint.classList.remove('show');
+        if (this.ammoEl) this.ammoEl.classList.remove('reloading');
+    }
+
+    showAmmoWarning() {
+        if (!this.ammoEl) return;
+        this.ammoEl.classList.add('empty');
+        setTimeout(() => this.ammoEl.classList.remove('empty'), 500);
     }
 
     addKillFeed(text, opts = {}) {
@@ -151,6 +181,7 @@ export const syncManager = new SyncManager();
 export let hud = null;
 
 soundManager.load('shoot', 'shoot.mp3');
+soundManager.load('gun_reload', 'gun_reload.mp3');
 
 function openLoginPopup() {
     const parentOrigin = window.location.origin;
@@ -235,6 +266,7 @@ playBtn.addEventListener('click', async () => {
 
     hud?.show();
     hud?.setHealth(100);
+    hud?.setAmmo(30, 30);
 
     loadingOverlay.classList.add('show');
     loadingText.innerText = "正在連線至伺服器...";
@@ -298,11 +330,27 @@ async function boot() {
     serverStatusText.classList.remove("pinging");
 }
 
+let _lastFrame = performance.now();
+
+let _lastCamPos = null;
+
 function loop() {
     requestAnimationFrame(loop);
-    const dt = 0.016;
+    const now = performance.now();
+    const dt = Math.min((now - _lastFrame) / 1000, 0.1);
+    _lastFrame = now;
+
     updateGame();
     updateRemotePlayers(dt);
+
+    const cam = getCamera();
+    const moving = _lastCamPos
+        ? cam.position.distanceToSquared(_lastCamPos) > 0.0001
+        : false;
+    _lastCamPos = cam.position.clone();
+
+    updateViewModel(now / 1000, moving);
+
     syncManager.sync();
     render();
 }

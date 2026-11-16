@@ -655,20 +655,86 @@ export function toggleHitboxes(colliders) {
     scene.add(debugHitboxesGroup);
 }
 
-export function updateViewModel(time, isMoving) {
-    if (!gunModel) return;
-    if (isMoving) {
-        gunModel.position.x = 0.25 + Math.sin(time * 10) * 0.01;
-        gunModel.position.y = -0.2 + Math.cos(time * 20) * 0.01;
-    } else {
-        gunModel.position.x += (0.25 - gunModel.position.x) * 0.1;
-        gunModel.position.y += (-0.2 - gunModel.position.y) * 0.1;
-    }
+// ============================================================
+// VIEW MODEL (first-person gun animation)
+// ============================================================
+let reloadState = {
+    active: false,
+    progress: 0,       // 0 → 1
+};
+
+export function setReloadState(active, progress = 0) {
+    reloadState.active = active;
+    reloadState.progress = progress;
 }
 
-// ============================================================
-// TRACERS
-// ============================================================
+export function updateViewModel(time, isMoving) {
+    if (!gunModel) return;
+
+    // Base position — start with the resting pose
+    let targetX = 0.25;
+    let targetY = -0.2;
+    let targetZ = -0.5;
+    let targetRotX = 0;
+    let targetRotY = -0.05;
+    let targetRotZ = 0;
+
+    // Idle / walk sway (existing behavior)
+    if (isMoving) {
+        targetX += Math.sin(time * 10) * 0.01;
+        targetY += Math.cos(time * 20) * 0.01;
+    }
+
+    // Reload animation — overrides base pose
+    if (reloadState.active) {
+        const t = reloadState.progress;   // 0 → 1
+
+        // Phase 1 (0.0–0.3): gun dips down and rotates
+        // Phase 2 (0.3–0.7): gun stays low, subtle shake (magazine change)
+        // Phase 3 (0.7–1.0): gun swings back up
+        let dip = 0;
+        let tilt = 0;
+        let shake = 0;
+
+        if (t < 0.3) {
+            const p = t / 0.3;                        // 0→1
+            dip = easeOutCubic(p) * 0.4;
+            tilt = easeOutCubic(p) * 0.9;
+        } else if (t < 0.7) {
+            dip = 0.4;
+            tilt = 0.9;
+            // Subtle shake during magazine swap
+            const shakePhase = (t - 0.3) / 0.4;       // 0→1
+            shake = Math.sin(shakePhase * Math.PI * 6) * 0.04;
+        } else {
+            const p = (t - 0.7) / 0.3;                // 0→1
+            dip = (1 - easeInCubic(p)) * 0.4;
+            tilt = (1 - easeInCubic(p)) * 0.9;
+        }
+
+        targetY -= dip;
+        targetRotZ = tilt;
+        targetX += shake;
+    }
+
+    // Smooth lerp toward target
+    const lerp = 0.25;
+    gunModel.position.x += (targetX - gunModel.position.x) * lerp;
+    gunModel.position.y += (targetY - gunModel.position.y) * lerp;
+    gunModel.position.z += (targetZ - gunModel.position.z) * lerp;
+    gunModel.rotation.x += (targetRotX - gunModel.rotation.x) * lerp;
+    gunModel.rotation.y += (targetRotY - gunModel.rotation.y) * lerp;
+    gunModel.rotation.z += (targetRotZ - gunModel.rotation.z) * lerp;
+}
+
+function easeOutCubic(t) {
+    return 1 - Math.pow(1 - t, 3);
+}
+
+function easeInCubic(t) {
+    return t * t * t;
+}
+
 let tracerGroup = new THREE.Group();
 let muzzleFlash = null;
 const activeTracers = [];   // { mesh, geo, mat, expireAt }
@@ -705,7 +771,6 @@ export function spawnBulletTracer(startPos, endPos, hitNormal, isHit, hitPoint, 
     });
 }
 
-// Remote tracer — no muzzle flash, no bullet hole on our side
 export function spawnRemoteTracer(ox, oy, oz, dx, dy, dz) {
     const start = new THREE.Vector3(ox, oy, oz);
     const dir = new THREE.Vector3(dx, dy, dz);
@@ -742,7 +807,6 @@ function spawnBulletHole(position, normal) {
     }
 }
 
-// Call each frame to clean up expired tracers
 function cleanupTracers() {
     const now = performance.now();
     for (let i = activeTracers.length - 1; i >= 0; i--) {
@@ -756,9 +820,6 @@ function cleanupTracers() {
     }
 }
 
-// ============================================================
-// ACCESSORS + RENDER
-// ============================================================
 export function getScene() { return scene; }
 export function getCamera() { return camera; }
 export function getClock() { return clock; }
