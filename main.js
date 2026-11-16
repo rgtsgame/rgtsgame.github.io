@@ -63,12 +63,42 @@ class HUD {
         this.deathOverlay?.classList.add('hidden');
     }
 
-    addKillFeed(text) {
+    addKillFeed(text, opts = {}) {
         if (!this.killfeed) return;
-        const d = document.createElement('div');
-        d.textContent = text;
-        this.killfeed.prepend(d);
-        setTimeout(() => d.remove(), 4000);
+
+        const {
+            duration = 4000,
+            accent = null,
+            type = 'info',
+        } = opts;
+
+        const entry = document.createElement('div');
+        entry.className = `feed-entry feed-${type}`;
+        entry.textContent = text;
+
+        if (accent) entry.style.borderLeftColor = accent;
+
+        this.killfeed.appendChild(entry);
+        void entry.offsetWidth;
+        entry.classList.add('enter');
+
+        const exitTimer = setTimeout(() => {
+            entry.classList.remove('enter');
+            entry.classList.add('exit');
+            setTimeout(() => entry.remove(), 400);
+        }, duration);
+
+        const MAX_ENTRIES = 6;
+        while (this.killfeed.children.length > MAX_ENTRIES) {
+            const oldest = this.killfeed.firstElementChild;
+            if (!oldest) break;
+            clearTimeout(oldest._exitTimer);
+            oldest.classList.remove('enter');
+            oldest.classList.add('exit');
+            setTimeout(() => oldest.remove(), 400);
+        }
+
+        entry._exitTimer = exitTimer;
     }
 
     updateScoreboard(rows) {
@@ -144,7 +174,7 @@ window.addEventListener('message', (event) => {
 
 window.addEventListener("DOMContentLoaded", () => {
     if (localStorage.getItem("authToken")) {
-        
+
         const displayName = localStorage.getItem('displayName');
         if (displayName) {
             document.getElementById("player-name").innerHTML = `<span class="level-badge">1</span> ` + displayName;

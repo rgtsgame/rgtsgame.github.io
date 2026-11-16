@@ -673,30 +673,36 @@ let tracerGroup = new THREE.Group();
 let muzzleFlash = null;
 const activeTracers = [];   // { mesh, geo, mat, expireAt }
 
-export function spawnBulletTracer(startPos, endPos, hitNormal, isHit, hitPoint) {
+export function spawnBulletTracer(startPos, endPos, hitNormal, isHit, hitPoint, isLocalShot = true) {
     const distance = startPos.distanceTo(endPos);
-    if (distance < 0.01) return;   // degenerate
+    if (distance < 0.01) return;
 
     const geometry = new THREE.CylinderGeometry(0.015, 0.015, distance, 4);
     geometry.translate(0, distance / 2, 0);
-
     const material = new THREE.MeshBasicMaterial({ color: 0xffff00 });
 
-    // Muzzle flash — only for the local player's own gun
-    if (!muzzleFlash) {
-        muzzleFlash = new THREE.PointLight(0xffaa00, 5, 5);
-        muzzleFlash.position.set(0.25, -0.2, -0.8);
-        getCamera().add(muzzleFlash);
+    // ✅ Only show muzzle flash for LOCAL shots
+    if (isLocalShot) {
+        if (!muzzleFlash) {
+            muzzleFlash = new THREE.PointLight(0xffaa00, 5, 5);
+            muzzleFlash.position.set(0.25, -0.2, -0.8);
+            getCamera().add(muzzleFlash);
+        }
+        muzzleFlash.visible = true;
+        setTimeout(() => {
+            if (muzzleFlash) muzzleFlash.visible = false;
+        }, 50);
     }
-    muzzleFlash.visible = true;
 
     if (isHit && hitPoint && hitNormal) {
         spawnBulletHole(hitPoint, hitNormal);
     }
 
-    setTimeout(() => {
-        if (muzzleFlash) muzzleFlash.visible = false;
-    }, 50);
+    activeTracers.push({
+        geo: geometry,
+        mat: material,
+        expireAt: performance.now() + 50,
+    });
 }
 
 // Remote tracer — no muzzle flash, no bullet hole on our side
@@ -707,7 +713,7 @@ export function spawnRemoteTracer(ox, oy, oz, dx, dy, dz) {
     dir.normalize();
     const end = start.clone().add(dir.multiplyScalar(100));
 
-    spawnBulletTracer(start, end, null, false, null);
+    spawnBulletTracer(start, end, null, false, null, false);
 }
 
 function spawnBulletHole(position, normal) {

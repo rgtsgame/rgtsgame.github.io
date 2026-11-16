@@ -132,7 +132,24 @@ export class SyncManager {
                 import('./renderer.js').then(m => {
                     m.spawnRemoteTracer(data[2], data[3], data[4], data[5], data[6], data[7]);
                 });
-                import('./main.js').then(m => m.soundManager?.play('shoot', 0.4, 1.0));
+                import('./game.js').then(g => {
+                    const me = g.getLocalPlayer();
+                    if (!me) return;
+
+                    const dist = Math.hypot(
+                        ox - me.position.x,
+                        oy - me.position.y,
+                        oz - me.position.z
+                    );
+
+                    // 0 → full volume, 50+ → silent
+                    const volume = Math.max(0, 1 - dist / 50) * 0.6;
+                    if (volume > 0.02) {
+                        import('./main.js').then(m => {
+                            m.soundManager?.play('shoot', volume, 1.0);
+                        });
+                    }
+                });
             }
             else if (packetId === 5) {
                 if (data[1] !== this.myId) return;
@@ -165,7 +182,43 @@ export class SyncManager {
                 import('./renderer.js').then(m => m.setRemotePlayerHealth(data[1], data[2]));
             }
             else if (packetId === 12) {
-                import('./main.js').then(m => m.hud?.addKillFeed(`${data[2]} ✖ ${data[4]}`));
+                const shooterName = data[2];
+                const targetName = data[4];
+                import('./main.js').then(m => {
+                    const myName = this.myName;
+                    let accent = null;
+                    if (shooterName === myName) accent = '#4CAF50';
+                    else if (targetName === myName) accent = '#F44336';
+                    m.hud?.addKillFeed(`${shooterName} ✖ ${targetName}`, {
+                        accent,
+                        type: 'kill',
+                    });
+                });
+            }
+            else if (packetId === 13) {
+                const joinPid = data[1];
+                const joinName = data[2];
+                if (joinPid === this.myId) return;
+                import('./main.js').then(m => {
+                    m.hud?.addKillFeed(`${joinName} 加入了戰場`, {
+                        accent: '#4CAF50',
+                        duration: 3000,
+                        type: 'join',
+                    });
+                });
+            }
+
+            else if (packetId === 14) {
+                const leftPid = data[1];
+                const leftName = data[2];
+                if (leftPid === this.myId) return;
+                import('./main.js').then(m => {
+                    m.hud?.addKillFeed(`${leftName} 離開了戰場`, {
+                        accent: '#888888',
+                        duration: 3000,
+                        type: 'leave',
+                    });
+                });
             }
             else if (packetId === 101) {
                 this.myId = data[1];
@@ -187,7 +240,7 @@ export class SyncManager {
             console.error("[ws] error:", e);
 
             setTimeout(() => {
-                hud.showError("無法連線至伺服器");
+                hud.showError("無法連線至伺服器", "若此問題重複發生，請重新載入此頁面並查看伺服器線上狀態。");
             }, 10);
         };
     }

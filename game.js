@@ -16,7 +16,6 @@ let spawnPoints = [];
 let powerups = [];
 let localPlayer = null;
 
-// ── 常數 ──────────────────────────────────────────────
 const PLAYER_HEIGHT = 1.7;
 const PLAYER_RADIUS = 0.4;
 const GRAVITY = 30;
@@ -24,15 +23,14 @@ const JUMP_FORCE = 11;
 const MOVE_SPEED = 12;
 const STEP_HEIGHT = 0.6;
 
-// 滑行相關
-const SLIDE_SPEED = 22;          // 滑行時的速度
-const SLIDE_DURATION = 0.55;     // 滑行持續秒數
-const SLIDE_COOLDOWN = 1.2;      // 滑行冷卻秒數
-const SLIDE_HEIGHT = 0.9;        // 滑行時視角高度
-let slideTimer = 0;              // 剩餘滑行時間
-let slideCooldownTimer = 0;      // 剩餘冷卻時間
+const SLIDE_SPEED = 22;
+const SLIDE_DURATION = 0.55;
+const SLIDE_COOLDOWN = 1.2;
+const SLIDE_HEIGHT = 0.9;
+let slideTimer = 0;
+let slideCooldownTimer = 0;
 let isSliding = false;
-const slideDir = new THREE.Vector3(); // 滑行方向（固定）
+const slideDir = new THREE.Vector3();
 
 let lastShootTime = 0;
 const FIRE_RATE = 150;
@@ -45,18 +43,16 @@ const SHAKE_STRENGTH = 0.5;
 const raycaster = new THREE.Raycaster();
 const downVector = new THREE.Vector3(0, -1, 0);
 
-// ── 裝置偵測 ──────────────────────────────────────────
 const isTouchDevice = ('ontouchstart' in window) || (navigator.maxTouchPoints > 0);
 let isMobile = isTouchDevice;
 
-// ── 手機控制狀態 ──────────────────────────────────────
 const mobileState = {
-    moveX: 0,          // 搖桿 X (-1~1)
-    moveY: 0,          // 搖桿 Y (-1~1)
+    moveX: 0,
+    moveY: 0,
     jumping: false,
     shooting: false,
     sliding: false,
-    lookTouchId: null, // 用於拖曳視角的觸控 ID
+    lookTouchId: null,
     lastLookX: 0,
     lastLookY: 0,
     joystickTouchId: null,
@@ -64,16 +60,14 @@ const mobileState = {
     joystickCenterY: 0,
 };
 
-let mobileUI = null; // 手機 UI 的 DOM 容器
+let mobileUI = null;
 
-// ── 初始化輸入 ────────────────────────────────────────
 export function initInput(canvas) {
-    // 桌機：點擊鎖定滑鼠
     canvas.addEventListener('click', () => {
+        if (localPlayer && localPlayer.alive === false) return;
         if (!isMobile) canvas.requestPointerLock();
     });
 
-    // 桌機：滑鼠視角
     document.addEventListener('mousemove', (e) => {
         if (isMobile) return;
         if (document.pointerLockElement !== canvas) return;
@@ -82,7 +76,6 @@ export function initInput(canvas) {
         pitch = Math.max(-Math.PI / 2, Math.min(Math.PI / 2, pitch));
     });
 
-    // 鍵盤
     addEventListener('keydown', (e) => {
         keys[e.code] = true;
         if (e.code === 'KeyH') toggleHitboxes(colliders);
@@ -90,7 +83,6 @@ export function initInput(canvas) {
     });
     addEventListener('keyup', (e) => keys[e.code] = false);
 
-    // 桌機滑鼠射擊
     addEventListener('mousedown', (e) => {
         if (isMobile) return;
         if (document.pointerLockElement === canvas && e.button === 0) {
@@ -98,28 +90,23 @@ export function initInput(canvas) {
         }
     });
 
-    // 視窗大小變化 → 更新 FOV
     addEventListener('resize', () => updateResponsiveFOV());
 
-    // 手機 UI
     if (isMobile) {
         buildMobileUI(canvas);
     }
 }
 
-// ── 響應式 FOV ────────────────────────────────────────
 function updateResponsiveFOV() {
     const camera = getCamera();
     if (!camera) return;
     const aspect = window.innerWidth / window.innerHeight;
-    // 寬螢幕（桌機）用較大 FOV；窄螢幕（手機直立）縮小避免變形
     let baseFov = 75;
     if (aspect < 0.8) {
-        baseFov = 85; // 直立手機需要更廣視野
+        baseFov = 85;
     } else if (aspect < 1.2) {
         baseFov = 80;
     }
-    // 螢幕較小時略微調整
     if (isMobile && window.innerHeight < 500) {
         baseFov += 5;
     }
@@ -127,11 +114,9 @@ function updateResponsiveFOV() {
     camera.updateProjectionMatrix();
 }
 
-// ── 建立手機 UI ───────────────────────────────────────
 function buildMobileUI(canvas) {
     if (mobileUI) return;
 
-    // 注入 CSS
     const style = document.createElement('style');
     style.textContent = `
         #mobile-ui {
@@ -192,11 +177,9 @@ function buildMobileUI(canvas) {
     `;
     document.head.appendChild(style);
 
-    // 建立 DOM
     mobileUI = document.createElement('div');
     mobileUI.id = 'mobile-ui';
 
-    // 搖桿
     const joyBase = document.createElement('div');
     joyBase.id = 'm-joystick-base';
     const joyKnob = document.createElement('div');
@@ -204,21 +187,18 @@ function buildMobileUI(canvas) {
     joyBase.appendChild(joyKnob);
     mobileUI.appendChild(joyBase);
 
-    // 射擊
     const shootBtn = document.createElement('div');
     shootBtn.id = 'm-btn-shoot';
     shootBtn.className = 'm-btn';
     shootBtn.textContent = '🔫';
     mobileUI.appendChild(shootBtn);
 
-    // 跳躍
     const jumpBtn = document.createElement('div');
     jumpBtn.id = 'm-btn-jump';
     jumpBtn.className = 'm-btn';
     jumpBtn.textContent = '⤒';
     mobileUI.appendChild(jumpBtn);
 
-    // 滑行
     const slideBtn = document.createElement('div');
     slideBtn.id = 'm-btn-slide';
     slideBtn.className = 'm-btn';
@@ -227,7 +207,6 @@ function buildMobileUI(canvas) {
 
     document.body.appendChild(mobileUI);
 
-    // ── 搖桿事件 ──
     const joyRadius = 65;
     joyBase.addEventListener('touchstart', (e) => {
         e.preventDefault();
@@ -262,7 +241,6 @@ function buildMobileUI(canvas) {
     joyBase.addEventListener('touchend', endJoy);
     joyBase.addEventListener('touchcancel', endJoy);
 
-    // ── 射擊按鈕（長按連射） ──
     let shootInterval = null;
     shootBtn.addEventListener('touchstart', (e) => {
         e.preventDefault();
@@ -282,7 +260,6 @@ function buildMobileUI(canvas) {
     shootBtn.addEventListener('touchend', endShoot);
     shootBtn.addEventListener('touchcancel', endShoot);
 
-    // ── 跳躍按鈕 ──
     jumpBtn.addEventListener('touchstart', (e) => {
         e.preventDefault();
         jumpBtn.classList.add('active');
@@ -296,7 +273,6 @@ function buildMobileUI(canvas) {
     jumpBtn.addEventListener('touchend', endJump);
     jumpBtn.addEventListener('touchcancel', endJump);
 
-    // ── 滑行按鈕 ──
     slideBtn.addEventListener('touchstart', (e) => {
         e.preventDefault();
         if (slideCooldownTimer > 0) return;
@@ -311,10 +287,8 @@ function buildMobileUI(canvas) {
         slideBtn.classList.remove('active');
     });
 
-    // ── 畫布拖曳轉視角 ──
     const lookArea = canvas;
     lookArea.addEventListener('touchstart', (e) => {
-        // 只處理落在畫布上、不在 UI 上的觸控
         for (const t of e.changedTouches) {
             if (mobileState.lookTouchId === null && !isTouchOnUI(t)) {
                 mobileState.lookTouchId = t.identifier;
@@ -350,11 +324,9 @@ function buildMobileUI(canvas) {
     lookArea.addEventListener('touchend', endLook);
     lookArea.addEventListener('touchcancel', endLook);
 
-    // 更新 FOV
     updateResponsiveFOV();
 }
 
-// 判斷觸控是否落在 UI 元素上（避免 UI 誤觸轉視角）
 function isTouchOnUI(touch) {
     if (!mobileUI) return false;
     const el = document.elementFromPoint(touch.clientX, touch.clientY);
@@ -362,7 +334,6 @@ function isTouchOnUI(touch) {
     return el.closest('#mobile-ui') !== null;
 }
 
-// 更新搖桿
 function updateJoystick(clientX, clientY, knob, radius) {
     let dx = clientX - mobileState.joystickCenterX;
     let dy = clientY - mobileState.joystickCenterY;
@@ -371,13 +342,12 @@ function updateJoystick(clientX, clientY, knob, radius) {
         dx = (dx / dist) * radius;
         dy = (dy / dist) * radius;
     }
-    mobileState.moveX = dx / radius; // -1~1
-    mobileState.moveY = dy / radius; // -1~1（下為正）
+    mobileState.moveX = dx / radius;
+    mobileState.moveY = dy / radius;
     knob.style.left = `calc(50% + ${dx}px)`;
     knob.style.top = `calc(50% + ${dy}px)`;
 }
 
-// ── 滑行邏輯 ──────────────────────────────────────────
 function tryStartSlide() {
     if (!localPlayer || !localPlayer.alive) return;
     if (slideCooldownTimer > 0) return;
@@ -387,7 +357,6 @@ function tryStartSlide() {
     slideTimer = SLIDE_DURATION;
     slideCooldownTimer = SLIDE_COOLDOWN;
 
-    // 決定滑行方向：若有移動輸入，沿輸入方向；否則沿面向方向
     const dir = getMoveInputDirection();
     if (dir.lengthSq() > 0.0001) {
         slideDir.copy(dir).normalize();
@@ -396,7 +365,6 @@ function tryStartSlide() {
     }
 }
 
-// 取得目前輸入的移動方向（世界座標，Y=0）
 function getMoveInputDirection() {
     const out = new THREE.Vector3(0, 0, 0);
     let ix = 0, iz = 0;
@@ -404,7 +372,6 @@ function getMoveInputDirection() {
     if (isMobile) {
         ix = mobileState.moveX;
         iz = mobileState.moveY;
-        // 只有超過死區才有效
         if (Math.hypot(ix, iz) < 0.15) return out;
     } else {
         if (keys['KeyW']) iz -= 1;
@@ -414,18 +381,16 @@ function getMoveInputDirection() {
         if (ix === 0 && iz === 0) return out;
     }
 
-    // 相機相對方向
     const forward = new THREE.Vector3(-Math.sin(yaw), 0, -Math.cos(yaw));
     const right = new THREE.Vector3(Math.cos(yaw), 0, -Math.sin(yaw));
 
-    // 注意：iz 為正代表「往下/往後」，所以 forward 要乘 -iz
     out.x = forward.x * -iz + right.x * ix;
     out.z = forward.z * -iz + right.z * ix;
     return out;
 }
 
-// ── 射擊 ──────────────────────────────────────────────
 function shoot() {
+    if (!localPlayer || !localPlayer.alive) return;
     const now = performance.now();
     if (now - lastShootTime < FIRE_RATE) return;
     lastShootTime = now;
@@ -445,12 +410,10 @@ function shoot() {
     const wallDist = hitsMap.length ? hitsMap[0].distance : Infinity;
     const remDist = hitsRemote.length ? hitsRemote[0].distance : Infinity;
 
-    // Always replicate the shot so other clients see the tracer
     const dir = camera.getWorldDirection(new THREE.Vector3());
     const gunOffset = new THREE.Vector3(0.2, -0.2, -0.5).applyMatrix4(camera.matrixWorld);
     syncManager?.sendShoot(gunOffset, dir);
 
-    // Priority: remote player if closer than wall
     if (remDist < wallDist) {
         const remoteId = findRemoteIdByObject(hitsRemote[0].object);
         if (remoteId) {
@@ -462,7 +425,6 @@ function shoot() {
         }
     }
 
-    // Wall / miss
     let hitPoint, hitNormal = null, isHit = false;
     if (hitsMap.length > 0) {
         hitPoint = hitsMap[0].point;
@@ -474,7 +436,6 @@ function shoot() {
     spawnBulletTracer(gunOffset, hitPoint, hitNormal, isHit, hitPoint);
 }
 
-// ── OBB 建構 ─────────────────────────────────────────
 function buildOBB(mesh) {
     const m = mesh.userData.originalData;
     const isPlane = m.type === 'plane';
@@ -496,7 +457,6 @@ function buildOBB(mesh) {
     };
 }
 
-// ── 初始化遊戲 ────────────────────────────────────────
 export function initGame(mapData) {
     const meshes = getLoadedMeshes();
     collidableMeshes = meshes.filter(mesh => mesh.userData.collidable);
@@ -512,7 +472,6 @@ export function initGame(mapData) {
 
     localPlayer = { position: spawnPos, velocityY: 0, onGround: false, alive: true };
 
-    // 重置滑行狀態
     isSliding = false;
     slideTimer = 0;
     slideCooldownTimer = 0;
@@ -520,7 +479,6 @@ export function initGame(mapData) {
     updateResponsiveFOV();
 }
 
-// ── 碰撞穿透計算 ──────────────────────────────────────
 function getPenetration(x, z, obb, buffer = PLAYER_RADIUS) {
     const dx = x - obb.position.x;
     const dz = z - obb.position.z;
@@ -615,14 +573,18 @@ function getGroundHeight(x, z, currentY) {
     return highestY;
 }
 
-// ── 更新遊戲主迴圈 ────────────────────────────────────
 export function updateGame() {
     if (!localPlayer) return;
+
+    if (localPlayer.alive === false) {
+        const cam = getCamera();
+        cam.position.copy(localPlayer.position);
+        return;
+    }
 
     const camera = getCamera();
     const dt = Math.min(getClock().getDelta(), 0.1);
 
-    // 更新滑行計時器
     if (slideCooldownTimer > 0) {
         slideCooldownTimer -= dt;
         if (slideCooldownTimer < 0) slideCooldownTimer = 0;
@@ -636,10 +598,8 @@ export function updateGame() {
         }
     }
 
-    // 更新滑行按鈕的可用狀態
     updateSlideButtonState();
 
-    // 取得移動輸入（鍵盤或搖桿）
     direction.set(0, 0, 0);
     let inputX = 0, inputZ = 0;
 
@@ -664,11 +624,9 @@ export function updateGame() {
     const speed = isSliding ? SLIDE_SPEED : MOVE_SPEED;
 
     if (isSliding) {
-        // 滑行中：沿固定方向移動（不受輸入影響）
         moveX = slideDir.x * speed * dt;
         moveZ = slideDir.z * speed * dt;
     } else {
-        // 注意：inputZ 為正代表「往後」，forward 要乘 -inputZ
         moveX = (forward.x * -inputZ + right.x * inputX) * speed * dt;
         moveZ = (forward.z * -inputZ + right.z * inputX) * speed * dt;
     }
@@ -691,7 +649,6 @@ export function updateGame() {
         localPlayer.velocityY = 0;
     }
 
-    // 垂直移動
     const groundY = getGroundHeight(localPlayer.position.x, localPlayer.position.z, localPlayer.position.y);
 
     const jumpPressed = isMobile ? mobileState.jumping : keys['Space'];
@@ -703,7 +660,6 @@ export function updateGame() {
     localPlayer.velocityY -= GRAVITY * dt;
     let nextY = localPlayer.position.y + (localPlayer.velocityY * dt);
 
-    // 天花板碰撞
     if (localPlayer.velocityY > 0) {
         for (const c of colliders) {
             if (c.isSlope) continue;
@@ -719,7 +675,6 @@ export function updateGame() {
         }
     }
 
-    // 地面 & 斜面
     if (nextY - PLAYER_HEIGHT <= groundY) {
         nextY = groundY + PLAYER_HEIGHT;
         localPlayer.velocityY = 0;
@@ -742,9 +697,7 @@ export function updateGame() {
     const shakePitch = (Math.random() - 0.5) * 0.1 * shakeIntensity;
     const shakeYaw = (Math.random() - 0.5) * 0.1 * shakeIntensity;
 
-    // ── 滑行時降低視角高度（平滑插值） ──
     const targetEyeOffset = isSliding ? (SLIDE_HEIGHT - PLAYER_HEIGHT) : 0;
-    // 用一個簡單的平滑追蹤
     if (localPlayer._eyeOffset === undefined) localPlayer._eyeOffset = 0;
     localPlayer._eyeOffset += (targetEyeOffset - localPlayer._eyeOffset) * Math.min(1, dt * 18);
 
@@ -758,7 +711,6 @@ export function updateGame() {
     camera.rotation.x = pitch + shakePitch;
 }
 
-// 更新滑行按鈕可用狀態（手機）
 function updateSlideButtonState() {
     if (!isMobile || !mobileUI) return;
     const btn = document.getElementById('m-btn-slide');
@@ -770,7 +722,6 @@ function updateSlideButtonState() {
     }
 }
 
-// ── 對外介面 ─────────────────────────────────────────
 export function getYaw() { return yaw; }
 export function getPitch() { return pitch; }
 export function getLocalPlayer() { return localPlayer; }
@@ -780,7 +731,6 @@ export function onServerJoined(serverId) {
 }
 
 export function onHitConfirmed(targetId, dmg, isKill) {
-    // Hitmarker already shown optimistically in shoot()
 }
 
 export function onLocalHealth(newHealth) {
@@ -793,9 +743,11 @@ export function onLocalHealth(newHealth) {
 export function onLocalDeath() {
     if (!localPlayer) return;
     localPlayer.alive = false;
-    isSliding = false;
-    slideTimer = 0;
-    document.exitPointerLock();
+
+    if (document.pointerLockElement) {
+        document.exitPointerLock();
+    }
+
     import('./main.js').then(m => {
         m.hud?.showDeathOverlay(5);
         m.soundManager?.play('death', 0.8, 1.0);
@@ -808,11 +760,6 @@ export function onLocalRespawn(x, y, z) {
     localPlayer.velocityY = 0;
     localPlayer.onGround = false;
     localPlayer.alive = true;
-    localPlayer._eyeOffset = 0;
-
-    isSliding = false;
-    slideTimer = 0;
-    slideCooldownTimer = 0;
 
     const cam = getCamera();
     cam.position.copy(localPlayer.position);
