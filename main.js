@@ -1,10 +1,8 @@
 import { initRenderer, loadMap, render, updateRemotePlayers } from './renderer.js';
 import { initInput, initGame, updateGame } from './game.js';
 import { SyncManager } from './syncManager.js';
+import { initCharacterPreview } from './characterPreview.js';
 
-// ============================================================
-// HUD
-// ============================================================
 class HUD {
     constructor() {
         this.hpEl = document.getElementById('hp-val');
@@ -82,11 +80,21 @@ class HUD {
             this.sbBody.appendChild(tr);
         }
     }
+
+    showError(title, text = "") {
+        canvas.style.display = "none";
+        document.exitPointerLock();
+
+        crosshair.classList.add('hidden');
+
+        this.hudEl?.classList.add('hidden');
+
+        document.getElementById("error-title").innerText = title;
+        document.getElementById("error-text").innerText = text;
+        document.getElementById("error-overlay").classList.add("show");
+    }
 }
 
-// ============================================================
-// SOUND
-// ============================================================
 class SoundManager {
     constructor() {
         this.sounds = {};
@@ -108,18 +116,12 @@ class SoundManager {
     }
 }
 
-// ============================================================
-// SHARED EXPORTS
-// ============================================================
 export const soundManager = new SoundManager();
 export const syncManager = new SyncManager();
 export let hud = null;
 
 soundManager.load('shoot', 'shoot.mp3');
 
-// ============================================================
-// AUTH / MENU
-// ============================================================
 function openLoginPopup() {
     const parentOrigin = window.location.origin;
     window.open(
@@ -142,7 +144,14 @@ window.addEventListener('message', (event) => {
 
 window.addEventListener("DOMContentLoaded", () => {
     if (localStorage.getItem("authToken")) {
-        document.getElementById("login-btn").innerText = localStorage.getItem("displayName") || "未設定名稱";
+        
+        const displayName = localStorage.getItem('displayName');
+        if (displayName) {
+            document.getElementById("player-name").innerHTML = `<span class="level-badge">1</span> ` + displayName;
+        }
+
+        document.getElementById("login-btn").innerText = displayName || "未設定名稱";
+
         document.getElementById("login-btn").removeEventListener("click", openLoginPopup);
         document.getElementById("login-btn").addEventListener("click", () => {
             localStorage.removeItem("authToken");
@@ -155,9 +164,18 @@ window.addEventListener("DOMContentLoaded", () => {
 
 document.getElementById("login-btn").addEventListener("click", openLoginPopup);
 
-// ============================================================
-// DOM REFS
-// ============================================================
+document.getElementById("error-back-btn").addEventListener("click", () => {
+    isGameActive = false;
+
+    document.getElementById("error-overlay").classList.remove("show");
+
+    menuContainer.style.display = 'flex';
+    setTimeout(() => {
+        canvas.style.display = "";
+        menuContainer.classList.remove("fade-out");
+    }, 600);
+});
+
 const loadingOverlay = document.getElementById('loading-overlay');
 const loadingText = document.getElementById('loading-text');
 const menuContainer = document.getElementById('menu-container');
@@ -171,7 +189,7 @@ initRenderer(canvas);
 let isGameActive = false;
 let mapData = null;
 
-playBtn.addEventListener('click', () => {
+playBtn.addEventListener('click', async () => {
     if (isGameActive) return;
     if (!mapData) {
         alert("Map not loaded yet!");
@@ -179,7 +197,6 @@ playBtn.addEventListener('click', () => {
     }
 
     isGameActive = true;
-    playBtn.innerText = "PLAYING";
 
     menuContainer.classList.add('fade-out');
     setTimeout(() => menuContainer.style.display = 'none', 300);
@@ -189,14 +206,16 @@ playBtn.addEventListener('click', () => {
     hud?.show();
     hud?.setHealth(100);
 
-    syncManager.connectForGame();
+    loadingOverlay.classList.add('show');
+    loadingText.innerText = "正在連線至伺服器...";
+
+    await syncManager.connectForGame();
+
+    loadingOverlay.classList.remove('show');
 
     canvas.requestPointerLock();
 });
 
-// ============================================================
-// BOOT
-// ============================================================
 async function boot() {
     loadingOverlay.classList.add('show');
     loadingText.innerText = "正在驗證遊戲...";
@@ -225,6 +244,8 @@ async function boot() {
     loadingOverlay.classList.remove('show');
     menuContainer.classList.remove('fade-out');
 
+    initCharacterPreview('character-preview');
+
     serverStatusText.innerText = "正在尋找伺服器...";
     await syncManager.fetchServerUrl();
 
@@ -234,7 +255,6 @@ async function boot() {
     initGame(mapData);
     initInput(canvas);
 
-    // Instantiate HUD after DOM is ready
     hud = new HUD();
 
     requestAnimationFrame(loop);
@@ -250,7 +270,7 @@ async function boot() {
 
 function loop() {
     requestAnimationFrame(loop);
-    const dt = 0.016;   // approximate — replace with real delta if you have one
+    const dt = 0.016;
     updateGame();
     updateRemotePlayers(dt);
     syncManager.sync();

@@ -62,7 +62,6 @@
             </div>
         </div>
 
-        <!-- Left Sidebar -->
         <div class="sidebar">
             <div class="nav-item active">
                 <div class="icon">🕹️</div><span>遊玩</span>
@@ -85,11 +84,9 @@
 
         <div class="main-content">
             <div class="character-area">
-                <h2 class="player-name"><span class="level-badge">1</span> ProGamer99</h2>
-                <div class="character-model-placeholder"></div>
-
-                <div class="character-actions">
-                    <button class="icon-btn plus-btn">+</button>
+                <h2 class="player-name" id="player-name"><span class="level-badge">1</span></h2>
+                <div class="character-model-placeholder">
+                    <canvas id="character-preview"></canvas>
                 </div>
             </div>
 
@@ -112,9 +109,11 @@
 
                 <div class="server-status">
                     <h2 class="pinging">正在尋找伺服器...</h2>
-                    <div class="server-options">
-                        <button class="secondary-btn">選擇伺服器</button>
-                    </div>
+                    <!--
+                        <div class="server-options">
+                            <button class="secondary-btn">選擇伺服器</button>
+                        </div>
+                    -->
                 </div>
             </div>
 
@@ -124,6 +123,12 @@
     <div id="loading-overlay" class="show">
         <div class="spinner"></div>
         <div id="loading-text">正在載入資源...</div>
+    </div>
+
+    <div id="error-overlay">
+        <h2 id="error-title">發生錯誤</h2>
+        <p id="error-text"></p>
+        <button id="error-back-btn">返回主畫面</button>
     </div>
 
     <script type="module" src="main.js"></script>

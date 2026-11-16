@@ -1,5 +1,6 @@
 import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js/+esm';
 import { getLocalPlayer, getYaw, getPitch } from './game.js';
+import { hud } from './main.js';
 
 const SUPABASE_URL = 'https://pajtakwbzhkgngfudloj.supabase.co';
 const SUPABASE_KEY = 'sb_publishable_9LpfQ4jhWRmNOA5tE31VRw_vF2_2VSy';
@@ -70,12 +71,17 @@ export class SyncManager {
     }
 
     connectForGame() {
-        if (!this.serverUrl) {
-            console.error("No server URL available to connect.");
-            return;
-        }
-        this.socket = new WebSocket(this.serverUrl);
-        this.setupEvents();
+        return new Promise((reslove) => {
+            if (!this.serverUrl) {
+                console.error("No server URL available to connect.");
+                reslove(false);
+                return;
+            }
+            this.socket = new WebSocket(this.serverUrl);
+            this.setupEvents();
+
+            reslove(true);
+        });
     }
 
     setupEvents() {
@@ -169,11 +175,20 @@ export class SyncManager {
             }
         };
 
-        this.socket.onerror = (e) => console.error("[ws] error:", e);
         this.socket.onclose = (e) => {
             console.warn("[ws] closed:", e.code, e.reason);
             clearInterval(this.pingInterval);
             this.pingInterval = null;
+
+            hud.showError("失去連線", "您已與伺服器中斷連線。");
+        };
+
+        this.socket.onerror = (e) => {
+            console.error("[ws] error:", e);
+
+            setTimeout(() => {
+                hud.showError("無法連線至伺服器");
+            }, 10);
         };
     }
 

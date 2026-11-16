@@ -153,11 +153,11 @@ body {
 }
 
 .character-area {
+    margin-top: 20px;
     display: flex;
     flex-direction: column;
     align-items: center;
     justify-content: flex-end;
-    padding-bottom: 50px;
     position: relative;
 }
 
@@ -165,7 +165,7 @@ body {
     color: #fff;
     font-size: 32px;
     text-shadow: 2px 2px 0 #000;
-    margin-bottom: 20px;
+    margin-bottom: 10px;
 }
 
 .level-badge {
@@ -335,6 +335,39 @@ button {
     visibility: visible;
 }
 
+#error-overlay {
+    position: fixed;
+    inset: 0;
+    background: #11111167;
+    color: white;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    z-index: 9999;
+    transition: transform 0.65s ease-in-out;
+    transform: translateY(100%);
+}
+
+#error-overlay.show {
+    transform: translateX(0);
+}
+
+#error-overlay button {
+    padding: 10px 15px;
+    font-size: 17px;
+    color: white;
+    border: none;
+    outline: none;
+    border-radius: 7px;
+    background-color: rgb(74, 74, 74);
+    margin-top: 10px;
+    transition: all 0.2s;
+}
+#error-overlay button:hover {
+    opacity: 0.8;
+}
+
 .spinner {
     width: 60px;
     height: 60px;
@@ -477,4 +510,18 @@ button {
 
 #damage-flash.flash {
     box-shadow: inset 0 0 120px 40px rgba(255, 0, 0, 0.6);
+}
+
+.character-model-placeholder {
+    position: relative;
+    width: 320px;
+    height: 420px;
+    margin-bottom: 10px;
+    background: radial-gradient(circle at 50% 60%, rgba(237, 142, 24, 0.15), transparent 70%);
+}
+
+#character-preview {
+    display: block;
+    width: 100%;
+    height: 100%;
 }
