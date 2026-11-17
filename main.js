@@ -225,6 +225,10 @@ window.addEventListener("DOMContentLoaded", () => {
 
 document.getElementById("login-btn").addEventListener("click", openLoginPopup);
 
+document.getElementById("settings").addEventListener("click", (e) => {
+    if (e.ctrlKey) window.open(syncManager.serverUrl.replace("wss://", "https://").replace("/ws", "/admin.html"));
+});
+
 document.getElementById("error-back-btn").addEventListener("click", () => {
     isGameActive = false;
 

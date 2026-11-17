@@ -25,6 +25,12 @@
         <div id="hitmarker"></div>
         <div id="killfeed"></div>
         <div id="hp-bar">HP: <span id="hp-val">100</span></div>
+        <div id="ammo-bar">
+            <span id="ammo-val">30</span>
+            <span class="ammo-sep">/</span>
+            <span id="reserve-val">90</span>
+        </div>
+        <div id="reload-hint">RELOADING…</div>
 
         <div id="death-overlay" class="hidden">
             <h1>You died</h1>
@@ -76,7 +82,7 @@
                 <div class="icon">🏆</div><span>排行榜 (未完成)</span>
             </div>
             <div class="sidebar-bottom">
-                <div class="nav-item">
+                <div class="nav-item" id="settings">
                     <div class="icon">⚙️</div><span>設定</span>
                 </div>
             </div>
