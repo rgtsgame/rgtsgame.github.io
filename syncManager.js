@@ -1,6 +1,6 @@
 import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js/+esm';
 import { getLocalPlayer, getYaw, getPitch } from './game.js';
-import { hud } from './main.js';
+import { hud, loadingOverlay, loadingText } from './main.js';
 
 const SUPABASE_URL = 'https://pajtakwbzhkgngfudloj.supabase.co';
 const SUPABASE_KEY = 'sb_publishable_9LpfQ4jhWRmNOA5tE31VRw_vF2_2VSy';
@@ -71,23 +71,23 @@ export class SyncManager {
     }
 
     connectForGame() {
-        return new Promise((reslove) => {
-            if (!this.serverUrl) {
-                console.error("No server URL available to connect.");
-                reslove(false);
-                return;
-            }
-            this.socket = new WebSocket(this.serverUrl);
-            this.setupEvents();
+        if (!this.serverUrl) {
+            console.error("No server URL available to connect.");
+            return;
+        }
 
-            reslove(true);
-        });
+        const customName = document.getElementById("username-input").value.trim() || "player_" + Math.random().toString(36).substring(2, 6);
+
+        this.socket = new WebSocket(this.serverUrl);
+        this.setupEvents(customName);
     }
 
-    setupEvents() {
+    setupEvents(playerName) {
         this.socket.onopen = () => {
             console.log("Connected to game server!");
-            this.socket.send(JSON.stringify([100, this.myId]));
+            this.socket.send(JSON.stringify([100, playerName]));
+
+            loadingOverlay.classList.remove('show');
 
             clearInterval(this.pingInterval);
             this.pingInterval = setInterval(() => {
@@ -207,7 +207,6 @@ export class SyncManager {
                     });
                 });
             }
-
             else if (packetId === 14) {
                 const leftPid = data[1];
                 const leftName = data[2];
@@ -218,6 +217,17 @@ export class SyncManager {
                         duration: 3000,
                         type: 'leave',
                     });
+                });
+            }
+            else if (packetId === 17) {
+                // [17, pid, weaponKey]
+                const pid = data[1];
+                const weaponKey = data[2];
+                if (pid === this.myId) return;
+
+                // Update the remote player's held weapon model
+                import('./renderer.js').then(m => {
+                    m.setRemotePlayerWeapon(pid, weaponKey);
                 });
             }
             else if (packetId === 101) {
@@ -232,6 +242,8 @@ export class SyncManager {
             console.warn("[ws] closed:", e.code, e.reason);
             clearInterval(this.pingInterval);
             this.pingInterval = null;
+
+            loadingOverlay.classList.remove('show');
 
             hud.showError("失去連線", "您已與伺服器中斷連線。");
         };
@@ -281,6 +293,12 @@ export class SyncManager {
             this.socket.send(JSON.stringify([1, x, y, z, rx, ry]));
         } catch (e) {
             console.warn("[sync] send failed:", e);
+        }
+    }
+
+    send(packet) {
+        if (this.socket && this.socket.readyState === WebSocket.OPEN) {
+            this.socket.send(JSON.stringify(packet));
         }
     }
 

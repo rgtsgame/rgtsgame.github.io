@@ -11,14 +11,11 @@ const MAX_BULLET_HOLES = 50;
 
 const PLAYER_HEIGHT = 1.7;
 
-// ============================================================
-// REMOTE PLAYERS
-// ============================================================
-const remotePlayers = new Map();   // id -> { mesh, nameTag, targetPos, targetYaw, alive }
+export let gunModels = {};
+export let setViewWeapon = () => { };
 
-// ============================================================
-// TEXTURES
-// ============================================================
+const remotePlayers = new Map();
+
 function createGrassTexture() {
     const canvas = document.createElement('canvas');
     canvas.width = 64;
@@ -50,8 +47,8 @@ function makeNameTagSprite(name) {
     canvas.height = 64;
     const ctx = canvas.getContext('2d');
     ctx.fillStyle = 'rgba(0,0,0,0.5)';
-    ctx.fillRect(0, 0, 256, 64);
-    ctx.font = 'bold 32px sans-serif';
+    ctx.fillRect(0, 10, 300, 40);
+    ctx.font = 'bold 32px Arial';
     ctx.fillStyle = '#fff';
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
@@ -64,9 +61,6 @@ function makeNameTagSprite(name) {
     return sprite;
 }
 
-// ============================================================
-// INIT
-// ============================================================
 export function initRenderer(canvas) {
     scene = new THREE.Scene();
     const skyColor = 0x87CEEB;
@@ -100,10 +94,11 @@ export function initRenderer(canvas) {
     sun.shadow.camera.bottom = -60;
     scene.add(sun);
 
-    // Tracer group — add to scene so remote tracers render
     scene.add(tracerGroup);
 
-    createGun();
+    const result = createGun();
+    gunModels = result.gunModels;
+    setViewWeapon = result.setViewWeapon;
 
     addEventListener('resize', () => {
         camera.aspect = innerWidth / innerHeight;
@@ -113,197 +108,302 @@ export function initRenderer(canvas) {
 }
 
 function createGun() {
-    gunModel = new THREE.Group();
-
-    // ---------- 材質 ----------
     const metalMat = new THREE.MeshStandardMaterial({
-        color: 0x1a1a1a, metalness: 0.9, roughness: 0.35
+        color: 0x2b2d31, metalness: 0.95, roughness: 0.35
+    });
+    const steelMat = new THREE.MeshStandardMaterial({
+        color: 0x8a8f96, metalness: 1.0, roughness: 0.25
     });
     const darkPolyMat = new THREE.MeshStandardMaterial({
-        color: 0x2b2b2b, metalness: 0.2, roughness: 0.8
+        color: 0x1e1f22, metalness: 0.15, roughness: 0.75
+    });
+    const woodMat = new THREE.MeshStandardMaterial({
+        color: 0x6b3f1d, metalness: 0.0, roughness: 0.85
     });
     const gripMat = new THREE.MeshStandardMaterial({
         color: 0x141414, metalness: 0.1, roughness: 0.95
     });
-    const accentMat = new THREE.MeshStandardMaterial({
-        color: 0x3a3a3a, metalness: 0.6, roughness: 0.5
+    const bladeMat = new THREE.MeshStandardMaterial({
+        color: 0xd8dde2, metalness: 1.0, roughness: 0.12
     });
 
-    // ---------- 槍身主體 (receiver) ----------
-    const receiver = new THREE.Mesh(
-        new THREE.BoxGeometry(0.09, 0.12, 0.42),
-        darkPolyMat
-    );
-    gunModel.add(receiver);
-
-    // 上機匣 (upper receiver，稍窄一點點，做出分層感)
-    const upper = new THREE.Mesh(
-        new THREE.BoxGeometry(0.085, 0.06, 0.40),
-        metalMat
-    );
-    upper.position.set(0, 0.09, 0);
-    gunModel.add(upper);
-
-    // ---------- 槍管 ----------
-    const barrel = new THREE.Mesh(
-        new THREE.CylinderGeometry(0.022, 0.022, 0.42, 12),
-        metalMat
-    );
-    barrel.rotation.x = Math.PI / 2;
-    barrel.position.set(0, 0.075, -0.40);
-    gunModel.add(barrel);
-
-    // 護木 (handguard，包住槍管前段)
-    const handguard = new THREE.Mesh(
-        new THREE.BoxGeometry(0.075, 0.075, 0.28),
-        darkPolyMat
-    );
-    handguard.position.set(0, 0.07, -0.34);
-    gunModel.add(handguard);
-
-    // 護木上的散熱孔裝飾 (幾條細長凹槽)
-    for (let i = 0; i < 4; i++) {
-        const slot = new THREE.Mesh(
-            new THREE.BoxGeometry(0.078, 0.012, 0.02),
-            gripMat
-        );
-        slot.position.set(0, 0.07, -0.46 + i * 0.05);
-        gunModel.add(slot);
+    function rbox(w, h, d, r = 0.005, seg = 2) {
+        if (typeof RoundedBoxGeometry !== 'undefined') {
+            return new RoundedBoxGeometry(w, h, d, seg, Math.min(r, w / 2, h / 2, d / 2));
+        }
+        return new THREE.BoxGeometry(w, h, d);
     }
 
-    // ---------- 槍口/消音器 ----------
-    const muzzle = new THREE.Mesh(
-        new THREE.CylinderGeometry(0.03, 0.028, 0.10, 12),
-        metalMat
-    );
-    muzzle.rotation.x = Math.PI / 2;
-    muzzle.position.set(0, 0.075, -0.66);
-    gunModel.add(muzzle);
+    function cylZ(rTop, rBottom, len, seg = 16) {
+        const g = new THREE.CylinderGeometry(rTop, rBottom, len, seg);
+        g.rotateX(Math.PI / 2);
+        return g;
+    }
 
-    // ---------- 準星 (front sight) ----------
-    const frontSightBase = new THREE.Mesh(
-        new THREE.BoxGeometry(0.04, 0.02, 0.05),
-        metalMat
-    );
-    frontSightBase.position.set(0, 0.12, -0.55);
-    gunModel.add(frontSightBase);
+    function mesh(geo, mat, x = 0, y = 0, z = 0) {
+        const m = new THREE.Mesh(geo, mat);
+        m.position.set(x, y, z);
+        return m;
+    }
 
-    const frontSightPost = new THREE.Mesh(
-        new THREE.BoxGeometry(0.008, 0.035, 0.008),
-        metalMat
-    );
-    frontSightPost.position.set(0, 0.145, -0.55);
-    gunModel.add(frontSightPost);
+    function curvedMag(segCount, length, w, d, curve, mat) {
+        const group = new THREE.Group();
+        const segLen = length / segCount;
+        let z = 0, y = 0, angle = 0;
+        for (let i = 0; i < segCount; i++) {
+            const seg = mesh(rbox(w, segLen + 0.001, d, 0.004, 2), mat);
+            seg.position.set(0, y, z);
+            seg.rotation.x = angle;
+            group.add(seg);
+            angle += curve;
+            y -= Math.cos(angle) * segLen;
+            z += Math.sin(angle) * segLen * 0.5;
+        }
+        return group;
+    }
 
-    // ---------- 彈匣 (magazine，微微前傾) ----------
-    const mag = new THREE.Mesh(
-        new THREE.BoxGeometry(0.06, 0.22, 0.10),
-        gripMat
-    );
-    mag.position.set(0, -0.16, 0.02);
-    mag.rotation.x = -0.12;   // 前傾
-    gunModel.add(mag);
+    function picatinnyRail(length, width = 0.022, toothH = 0.004, mat = metalMat) {
+        const g = new THREE.Group();
+        const base = mesh(rbox(width, toothH, length, 0.002, 1), mat);
+        g.add(base);
+        const count = Math.floor(length / 0.012);
+        for (let i = 0; i < count; i++) {
+            const t = mesh(rbox(width * 0.9, toothH * 0.6, 0.007, 0.001, 1), mat);
+            t.position.set(0, toothH * 0.8, -length / 2 + 0.006 + i * 0.012);
+            g.add(t);
+        }
+        return g;
+    }
 
-    // 彈匣底部加厚
-    const magBase = new THREE.Mesh(
-        new THREE.BoxGeometry(0.065, 0.02, 0.11),
-        metalMat
-    );
-    magBase.position.set(0, -0.27, 0.03);
-    magBase.rotation.x = -0.12;
-    gunModel.add(magBase);
+    const models = {};
 
-    // ---------- 握把 (pistol grip) ----------
-    const grip = new THREE.Mesh(
-        new THREE.BoxGeometry(0.055, 0.16, 0.07),
-        gripMat
-    );
-    grip.position.set(0, -0.12, 0.19);
-    grip.rotation.x = 0.28;   // 後傾
-    gunModel.add(grip);
+    const ak47 = new THREE.Group();
 
-    // ---------- 扳機護弓 ----------
-    const triggerGuard = new THREE.Mesh(
-        new THREE.TorusGeometry(0.035, 0.008, 6, 12, Math.PI),
-        metalMat
-    );
-    triggerGuard.rotation.z = Math.PI;
-    triggerGuard.rotation.y = Math.PI / 2;
-    triggerGuard.position.set(0, -0.06, 0.10);
-    gunModel.add(triggerGuard);
+    const akBody = mesh(rbox(0.075, 0.085, 0.42, 0.008, 3), metalMat, 0, 0, 0.05);
+    ak47.add(akBody);
 
-    // 扳機
-    const trigger = new THREE.Mesh(
-        new THREE.BoxGeometry(0.01, 0.025, 0.015),
-        metalMat
-    );
-    trigger.position.set(0, -0.05, 0.10);
-    trigger.rotation.x = 0.2;
-    gunModel.add(trigger);
+    const akDustCover = mesh(rbox(0.070, 0.03, 0.34, 0.012, 3), metalMat, 0, 0.055, 0.05);
+    ak47.add(akDustCover);
 
-    // ---------- 槍托 (stock) ----------
-    const stock = new THREE.Mesh(
-        new THREE.BoxGeometry(0.07, 0.10, 0.22),
-        darkPolyMat
-    );
-    stock.position.set(0, -0.01, 0.34);
-    gunModel.add(stock);
+    const akEjectPort = mesh(new THREE.BoxGeometry(0.002, 0.025, 0.07), darkPolyMat, 0.038, 0.025, -0.02);
+    ak47.add(akEjectPort);
 
-    const stockPad = new THREE.Mesh(
-        new THREE.BoxGeometry(0.075, 0.12, 0.02),
-        gripMat
-    );
-    stockPad.position.set(0, -0.01, 0.46);
-    gunModel.add(stockPad);
+    const akChargeHandle = mesh(rbox(0.012, 0.014, 0.045, 0.003, 2), metalMat, 0.042, 0.03, 0.02);
+    ak47.add(akChargeHandle);
 
-    // ---------- 後照準 (rear sight) ----------
-    const rearSight = new THREE.Mesh(
-        new THREE.BoxGeometry(0.05, 0.025, 0.04),
-        metalMat
-    );
-    rearSight.position.set(0, 0.14, 0.06);
-    gunModel.add(rearSight);
+    const akSelector = mesh(rbox(0.006, 0.018, 0.06, 0.002, 2), metalMat, 0.040, -0.005, 0.08);
+    akSelector.rotation.x = -0.15;
+    ak47.add(akSelector);
 
-    // 後照準上的小缺口 (兩根小柱)
-    const rsL = new THREE.Mesh(
-        new THREE.BoxGeometry(0.01, 0.015, 0.01),
-        metalMat
-    );
-    rsL.position.set(-0.012, 0.16, 0.06);
-    gunModel.add(rsL);
-    const rsR = rsL.clone();
-    rsR.position.x = 0.012;
-    gunModel.add(rsR);
+    const rivetGeo = new THREE.SphereGeometry(0.004, 8, 6);
+    [[0.038, 0.01, 0.16], [0.038, -0.01, 0.16],
+    [0.038, 0.01, -0.02], [-0.038, 0.01, -0.02],
+    [-0.038, 0.01, 0.16]].forEach(([x, y, z]) => {
+        ak47.add(mesh(rivetGeo, metalMat, x, y, z));
+    });
 
-    // ---------- 拉機柄 (charging handle) ----------
-    const chargingHandle = new THREE.Mesh(
-        new THREE.BoxGeometry(0.04, 0.015, 0.03),
-        metalMat
-    );
-    chargingHandle.position.set(0, 0.11, 0.18);
-    gunModel.add(chargingHandle);
+    ak47.add(mesh(cylZ(0.016, 0.016, 0.32, 16), metalMat, 0, 0.018, -0.30));
+    ak47.add(mesh(cylZ(0.026, 0.026, 0.04, 16), metalMat, 0, 0.018, -0.16));
+    ak47.add(mesh(cylZ(0.024, 0.024, 0.05, 16), metalMat, 0, 0.018, -0.47));
+    ak47.add(mesh(cylZ(0.028, 0.028, 0.02, 16), metalMat, 0, 0.018, -0.50));
 
-    // ---------- 戰術握把 (foregrip，護木下方) ----------
-    const foregrip = new THREE.Mesh(
-        new THREE.BoxGeometry(0.045, 0.10, 0.05),
-        gripMat
-    );
-    foregrip.position.set(0, -0.02, -0.30);
-    gunModel.add(foregrip);
+    ak47.add(mesh(cylZ(0.022, 0.022, 0.035, 12), metalMat, 0, 0.058, -0.28));
+    ak47.add(mesh(cylZ(0.012, 0.012, 0.26, 10), metalMat, 0, 0.058, -0.16));
+    ak47.add(mesh(cylZ(0.017, 0.017, 0.015, 12), metalMat, 0, 0.058, -0.03));
 
-    // ---------- 整體位置與姿態 ----------
-    gunModel.position.set(0.25, -0.2, -0.5);
-    gunModel.rotation.y = -0.05;
-    gunModel.rotation.x = 0.02;
+    const akHandguard = mesh(rbox(0.065, 0.058, 0.22, 0.012, 3), woodMat, 0, -0.005, -0.28);
+    ak47.add(akHandguard);
+    const akUpperGuard = mesh(rbox(0.058, 0.032, 0.18, 0.010, 3), woodMat, 0, 0.055, -0.27);
+    ak47.add(akUpperGuard);
 
-    // 稍微整體縮放，讓比例更順眼
-    gunModel.scale.setScalar(0.95);
+    ak47.add(mesh(cylZ(0.032, 0.032, 0.012, 12), metalMat, 0, 0.025, -0.17));
 
-    camera.add(gunModel);
+    const akMag = curvedMag(6, 0.20, 0.055, 0.085, 0.18, darkPolyMat);
+    akMag.position.set(0, -0.08, -0.02);
+    ak47.add(akMag);
+    ak47.add(mesh(rbox(0.02, 0.02, 0.012, 0.002, 1), metalMat, 0, -0.09, 0.03));
+
+    const akGrip = mesh(rbox(0.045, 0.13, 0.06, 0.008, 3), gripMat, 0, -0.115, 0.16);
+    akGrip.rotation.x = 0.22;
+    ak47.add(akGrip);
+    for (let i = 0; i < 5; i++) {
+        const ridge = mesh(rbox(0.046, 0.005, 0.062, 0.002, 1), gripMat, 0, -0.155 + i * 0.014, 0.16);
+        ridge.rotation.x = 0.22;
+        ak47.add(ridge);
+    }
+
+    const akTriggerGuard = mesh(
+        new THREE.TorusGeometry(0.028, 0.004, 8, 16, Math.PI), metalMat, 0, -0.065, 0.075);
+    akTriggerGuard.rotation.x = Math.PI / 2;
+    akTriggerGuard.rotation.z = Math.PI;
+    ak47.add(akTriggerGuard);
+    const akTrigger = mesh(rbox(0.008, 0.026, 0.008, 0.002, 1), metalMat, 0, -0.062, 0.075);
+    akTrigger.rotation.x = -0.15;
+    ak47.add(akTrigger);
+
+    ak47.add(mesh(rbox(0.045, 0.018, 0.03, 0.002, 2), metalMat, 0, 0.075, 0.02));
+    ak47.add(mesh(rbox(0.006, 0.012, 0.008, 0.001, 1), metalMat, -0.011, 0.086, 0.02));
+    ak47.add(mesh(rbox(0.006, 0.012, 0.008, 0.001, 1), metalMat, 0.011, 0.086, 0.02));
+    ak47.add(mesh(rbox(0.03, 0.045, 0.02, 0.003, 2), metalMat, 0, 0.048, -0.44));
+    ak47.add(mesh(new THREE.CylinderGeometry(0.002, 0.002, 0.025, 6), metalMat, 0, 0.075, -0.44));
+    ak47.add(mesh(rbox(0.006, 0.03, 0.006, 0.001, 1), metalMat, -0.013, 0.065, -0.44));
+    ak47.add(mesh(rbox(0.006, 0.03, 0.006, 0.001, 1), metalMat, 0.013, 0.065, -0.44));
+
+    const akStock = mesh(rbox(0.052, 0.075, 0.26, 0.010, 3), woodMat, 0, -0.012, 0.39);
+    ak47.add(mesh(rbox(0.056, 0.085, 0.012, 0.004, 2), metalMat, 0, -0.014, 0.52));
+    const slingLoop = mesh(new THREE.TorusGeometry(0.012, 0.0025, 6, 12), metalMat, -0.028, -0.05, 0.46);
+    slingLoop.rotation.y = Math.PI / 2;
+    ak47.add(slingLoop);
+
+    ak47.position.set(0.22, -0.19, -0.42);
+    ak47.rotation.y = 0.04;
+    models.ak47 = ak47;
+
+    const pistol = new THREE.Group();
+
+    const pistolSlide = mesh(rbox(0.048, 0.045, 0.26, 0.006, 3), metalMat, 0, 0.02, -0.03);
+    pistol.add(pistolSlide);
+
+    const pistolSlideFrontBevel = mesh(rbox(0.044, 0.012, 0.03, 0.004, 2), metalMat, 0, 0.04, -0.14);
+    pistolSlideFrontBevel.rotation.x = 0.4;
+    pistol.add(pistolSlideFrontBevel);
+
+    const rail = picatinnyRail(0.07);
+    rail.position.set(0, -0.005, -0.10);
+    pistol.add(rail);
+
+    for (let i = 0; i < 5; i++) {
+        const serr = mesh(rbox(0.05, 0.028, 0.005, 0.001, 1), metalMat, 0, 0.02, 0.045 + i * 0.010);
+        pistol.add(serr);
+    }
+
+    pistol.add(mesh(new THREE.BoxGeometry(0.002, 0.022, 0.055), darkPolyMat, 0.024, 0.028, -0.05));
+
+    pistol.add(mesh(cylZ(0.012, 0.012, 0.03, 12), steelMat, 0, 0.02, -0.17));
+    pistol.add(mesh(new THREE.TorusGeometry(0.011, 0.002, 6, 16), steelMat, 0, 0.02, -0.185));
+
+    const pistolFrame = mesh(rbox(0.044, 0.04, 0.20, 0.006, 2), darkPolyMat, 0, -0.018, 0.00);
+    pistol.add(pistolFrame);
+
+    pistol.add(mesh(rbox(0.046, 0.006, 0.16, 0.002, 1), metalMat, 0, 0.005, 0.00));
+
+    pistol.add(mesh(rbox(0.036, 0.012, 0.06, 0.002, 1), darkPolyMat, 0, -0.036, -0.08));
+
+    const pistolGrip = mesh(rbox(0.042, 0.13, 0.055, 0.010, 3), gripMat, 0, -0.09, 0.075);
+    pistolGrip.rotation.x = 0.28;
+    pistol.add(pistolGrip);
+
+    for (let i = 0; i < 6; i++) {
+        const ridge = mesh(rbox(0.043, 0.004, 0.058, 0.001, 1), gripMat, 0, -0.14 + i * 0.014, 0.075);
+        ridge.rotation.x = 0.28;
+        pistol.add(ridge);
+    }
+
+    pistol.add(mesh(rbox(0.044, 0.012, 0.06, 0.003, 2), darkPolyMat, 0, -0.155, 0.10));
+    pistol.add(mesh(rbox(0.044, 0.11, 0.006, 0.002, 1), darkPolyMat, 0, -0.085, 0.115));
+
+    const pistolGuard = mesh(new THREE.TorusGeometry(0.026, 0.004, 8, 16, Math.PI), darkPolyMat, 0, -0.04, 0.015);
+    pistolGuard.rotation.x = Math.PI / 2;
+    pistolGuard.rotation.z = Math.PI;
+    pistol.add(pistolGuard);
+
+    const pistolTrigger = mesh(rbox(0.007, 0.024, 0.008, 0.002, 1), metalMat, 0, -0.038, 0.015);
+    pistolTrigger.rotation.x = -0.12;
+    pistol.add(pistolTrigger);
+
+    pistol.add(mesh(rbox(0.003, 0.015, 0.004, 0.001, 1), darkPolyMat, 0, -0.037, 0.018));
+
+    pistol.add(mesh(rbox(0.006, 0.012, 0.008, 0.001, 1), metalMat, 0, 0.048, -0.155));
+    pistol.add(mesh(rbox(0.032, 0.008, 0.008, 0.001, 1), metalMat, 0, 0.048, 0.075));
+    pistol.add(mesh(rbox(0.008, 0.012, 0.008, 0.001, 1), metalMat, -0.011, 0.052, 0.075));
+    pistol.add(mesh(rbox(0.008, 0.012, 0.008, 0.001, 1), metalMat, 0.011, 0.052, 0.075));
+
+    pistol.add(mesh(rbox(0.006, 0.008, 0.04, 0.002, 1), metalMat, 0.024, -0.005, 0.02));
+    pistol.add(mesh(rbox(0.008, 0.010, 0.008, 0.002, 1), darkPolyMat, 0.024, -0.035, 0.05));
+    const takedown = mesh(new THREE.CylinderGeometry(0.008, 0.008, 0.006, 12), metalMat, 0.024, 0.005, 0.06);
+    takedown.rotation.z = Math.PI / 2;
+    pistol.add(takedown);
+
+    pistol.position.set(0.22, -0.20, -0.40);
+    pistol.rotation.y = 0.03;
+    models.pistol = pistol;
+
+    const knife = new THREE.Group();
+
+    const bladeShape = new THREE.Shape();
+    bladeShape.moveTo(-0.014, 0);
+    bladeShape.lineTo(0.014, 0);
+    bladeShape.lineTo(0.014, 0.20);
+    bladeShape.lineTo(0.010, 0.235);
+    bladeShape.lineTo(-0.010, 0.245);
+    bladeShape.lineTo(-0.014, 0.20);
+    bladeShape.lineTo(-0.014, 0.02);
+    bladeShape.closePath();
+
+    const bladeExtrude = new THREE.ExtrudeGeometry(bladeShape, {
+        depth: 0.012,
+        bevelEnabled: true,
+        bevelThickness: 0.0012,
+        bevelSize: 0.0015,
+        bevelSegments: 2,
+        steps: 1
+    });
+    bladeExtrude.center();
+    const blade = new THREE.Mesh(bladeExtrude, bladeMat);
+    blade.rotation.x = -Math.PI / 2;
+    blade.position.set(0, 0, -0.12);
+    knife.add(blade);
+
+    const fuller = mesh(rbox(0.002, 0.002, 0.16, 0.0005, 1), metalMat, 0.004, 0.004, -0.12);
+    knife.add(fuller);
+
+    const guard = mesh(rbox(0.06, 0.012, 0.018, 0.004, 2), metalMat, 0, 0, 0);
+    knife.add(guard);
+
+    const handle = mesh(rbox(0.030, 0.030, 0.13, 0.008, 3), gripMat, 0, 0, 0.085);
+    knife.add(handle);
+
+    for (const s of [-1, 1]) {
+        const scale = mesh(rbox(0.006, 0.028, 0.11, 0.002, 1), darkPolyMat, s * 0.014, 0, 0.085);
+        knife.add(scale);
+    }
+
+    for (let i = 0; i < 3; i++) {
+        const rivet = mesh(new THREE.CylinderGeometry(0.0035, 0.0035, 0.034, 10), metalMat, 0, 0, 0.045 + i * 0.04);
+        rivet.rotation.z = Math.PI / 2;
+        knife.add(rivet);
+    }
+
+    const pommel = mesh(cylZ(0.016, 0.016, 0.018, 10), metalMat, 0, 0, 0.16);
+    knife.add(pommel);
+    const lanyardHole = mesh(new THREE.CylinderGeometry(0.003, 0.003, 0.036, 8), darkPolyMat, 0, 0, 0.16);
+    lanyardHole.rotation.z = Math.PI / 2;
+    knife.add(lanyardHole);
+
+    const gripRing = mesh(new THREE.TorusGeometry(0.015, 0.0025, 8, 16), metalMat, 0, 0, 0.03);
+    gripRing.rotation.y = Math.PI / 2;
+    knife.add(gripRing);
+
+    knife.position.set(0.24, -0.20, -0.40);
+    knife.rotation.set(0.15, -0.30, 0.10);
+    models.knife = knife;
+
+    camera.add(models.ak47);
+    camera.add(models.pistol);
+    camera.add(models.knife);
+
+    models.ak47.visible = true;
+    models.pistol.visible = false;
+    models.knife.visible = false;
+
+    function setViewWeapon(key) {
+        for (const k in models) models[k].visible = false;
+        if (models[key]) models[key].visible = true;
+    }
+
+    return { gunModels: models, setViewWeapon };
 }
-// ============================================================
-// NPC MESHES
-// ============================================================
+
 export const npcMeshes = [];
 
 export function spawnNPCMesh(id, position) {
@@ -357,10 +457,6 @@ export function flashNPC(id) {
     }
 }
 
-// ============================================================
-// REMOTE PLAYERS — public API
-// ============================================================
-
 export function spawnRemotePlayer(id, name = 'player') {
     if (remotePlayers.has(id)) return;
 
@@ -390,25 +486,63 @@ export function spawnRemotePlayer(id, name = 'player') {
     armR.castShadow = true;
     group.add(armR);
 
-    group.userData = { type: 'remotePlayer', id: id, bodyMesh: body };
-    body.userData.remoteId = id;
-
     const nameTag = makeNameTagSprite(name);
     group.add(nameTag);
 
     scene.add(group);
 
-    // Health bar lives in scene root — not parented to the rotating group
     const healthBar = makeHealthBar();
     healthBar.group.position.set(0, 0, 0);
     scene.add(healthBar.group);
 
+    // ✅ NEW: Clone the actual 3D models
+    const weaponGroup = new THREE.Group();
+
+    // Scale down so it's proportional to the blocky body
+    weaponGroup.scale.set(2, 2, 2);
+
+    // Move it to the end of the arm and rotate it forward
+    weaponGroup.position.set(0, -0.45, -0.1);
+    weaponGroup.rotation.x = 0;
+
+    if (gunModels.ak47) {
+        const ak = gunModels.ak47.clone();
+        ak.position.set(0, 0, 0); // Reset local position
+        ak.rotation.set(0, 0, 0); // Reset local rotation
+        weaponGroup.add(ak);
+    }
+    if (gunModels.pistol) {
+        const p = gunModels.pistol.clone();
+        p.position.set(0, 0, 0);
+        p.rotation.set(0, 0, 0);
+        weaponGroup.add(p);
+    }
+    if (gunModels.knife) {
+        const k = gunModels.knife.clone();
+        k.position.set(0, 0, 0);
+        k.rotation.set(0, 0, 0);
+        weaponGroup.add(k);
+    }
+
+    // By default, show the AK-47, hide the others
+    if (weaponGroup.children[0]) weaponGroup.children[0].visible = true;
+    if (weaponGroup.children[1]) weaponGroup.children[1].visible = false;
+    if (weaponGroup.children[2]) weaponGroup.children[2].visible = false;
+
+    armR.add(weaponGroup);
+
+    // Mark for raycast resolution
+    group.userData = { type: 'remotePlayer', id: id, bodyMesh: body };
+    body.userData.remoteId = id;
+
     remotePlayers.set(id, {
-        id, name,
+        id,
+        name,
         mesh: group,
         nameTag,
         healthBar,
         bodyMat,
+        weaponGroup, // ✅ Save reference to the group
         targetPos: new THREE.Vector3(0, 0, 0),
         targetYaw: 0,
         targetHealth: 100,
@@ -416,6 +550,22 @@ export function spawnRemotePlayer(id, name = 'player') {
     });
 
     return group;
+}
+
+export function setRemotePlayerWeapon(id, weaponKey) {
+    const rp = remotePlayers.get(id);
+    if (!rp || !rp.weaponGroup) return;
+
+    // The weaponGroup children are added in this order: [ak47, pistol, knife]
+    // based on how we pushed them in spawnRemotePlayer
+    const children = rp.weaponGroup.children;
+    if (children.length < 3) return;
+
+    children.forEach(c => c.visible = false);
+
+    if (weaponKey === 'ak47' && children[0]) children[0].visible = true;
+    if (weaponKey === 'pistol' && children[1]) children[1].visible = true;
+    if (weaponKey === 'knife' && children[2]) children[2].visible = true;
 }
 
 function makeHealthBar() {
@@ -426,7 +576,7 @@ function makeHealthBar() {
     const fillGeo = new THREE.PlaneGeometry(1.0, 0.10);
     const fillMat = new THREE.MeshBasicMaterial({ color: 0x2ecc71, depthTest: false });
     const fill = new THREE.Mesh(fillGeo, fillMat);
-    fill.position.z = 0.001;   // avoid z-fighting with bg
+    fill.position.z = 0.001;
 
     const group = new THREE.Group();
     group.add(bg);
@@ -439,9 +589,7 @@ function makeHealthBar() {
         setHealth(h) {
             const pct = Math.max(0, Math.min(1, h / 100));
             fill.scale.x = pct;
-            // Keep the left edge anchored while scaling
             fill.position.x = -(1 - pct) * 0.5;
-            // Color: green → yellow → red
             const color = pct > 0.5
                 ? new THREE.Color(0xff4444).lerp(new THREE.Color(0x2ecc71), (pct - 0.5) * 2)
                 : new THREE.Color(0xff4444).lerp(new THREE.Color(0xffaa00), pct * 2);
@@ -490,7 +638,6 @@ export function updateRemotePlayers(dt) {
         while (dy < -Math.PI) dy += Math.PI * 2;
         rp.mesh.rotation.y += dy * lerp;
 
-        // Health bar: follow mesh position, float above head, face camera
         rp.healthBar.group.position.set(
             rp.mesh.position.x,
             rp.mesh.position.y + 2.5,
@@ -505,7 +652,7 @@ export function updateRemotePlayers(dt) {
 export function updateRemotePlayer(id, x, y, z, rx, ry) {
     const rp = remotePlayers.get(id);
     if (!rp) return;
-    // Server sends eye height; mesh origin is at feet
+    // Subtract PLAYER_HEIGHT so the feet touch the ground, not the camera height
     rp.targetPos.set(x, y - PLAYER_HEIGHT, z);
     rp.targetYaw = ry;
 }
@@ -530,7 +677,6 @@ export function showRemotePlayer(id, x, y, z) {
     rp.healthBar.group.visible = true;
 }
 
-// Returns visible remote player meshes for raycasting
 export function getRemotePlayerMeshes() {
     const out = [];
     remotePlayers.forEach(rp => {
@@ -539,7 +685,6 @@ export function getRemotePlayerMeshes() {
     return out;
 }
 
-// Walk up parent chain from a raycast hit to find the remote player id
 export function findRemoteIdByObject(obj) {
     let cur = obj;
     while (cur) {
@@ -568,9 +713,6 @@ export function flashRemotePlayer(id) {
     }, 100);
 }
 
-// ============================================================
-// MAP LOADING
-// ============================================================
 export async function loadMap(url) {
     const res = await fetch(url);
     const data = await res.json();
@@ -638,29 +780,24 @@ export function toggleHitboxes(colliders) {
     const debugMat = new THREE.LineBasicMaterial({ color: 0xff0000 });
 
     for (const c of colliders) {
-        const w = c.max.x - c.min.x;
-        const h = c.max.y - c.min.y;
-        const d = c.max.z - c.min.z;
-        const cx = c.min.x + w / 2;
-        const cy = c.min.y + h / 2;
-        const cz = c.min.z + d / 2;
-
-        const geo = new THREE.BoxGeometry(w, h, d);
+        // Generate a BoxGeometry based on the halfSize
+        const geo = new THREE.BoxGeometry(c.halfSize.x * 2, c.halfSize.y * 2, c.halfSize.z * 2);
         const edges = new THREE.EdgesGeometry(geo);
         const line = new THREE.LineSegments(edges, debugMat);
-        line.position.set(cx, cy, cz);
+
+        // Apply the exact position and rotation from the OBB
+        line.position.copy(c.position);
+        line.rotation.copy(c.rotation);
+
         debugHitboxesGroup.add(line);
     }
 
     scene.add(debugHitboxesGroup);
 }
 
-// ============================================================
-// VIEW MODEL (first-person gun animation)
-// ============================================================
 let reloadState = {
     active: false,
-    progress: 0,       // 0 → 1
+    progress: 0,
 };
 
 export function setReloadState(active, progress = 0) {
@@ -671,7 +808,6 @@ export function setReloadState(active, progress = 0) {
 export function updateViewModel(time, isMoving) {
     if (!gunModel) return;
 
-    // Base position — start with the resting pose
     let targetX = 0.25;
     let targetY = -0.2;
     let targetZ = -0.5;
@@ -679,35 +815,29 @@ export function updateViewModel(time, isMoving) {
     let targetRotY = -0.05;
     let targetRotZ = 0;
 
-    // Idle / walk sway (existing behavior)
     if (isMoving) {
         targetX += Math.sin(time * 10) * 0.01;
         targetY += Math.cos(time * 20) * 0.01;
     }
 
-    // Reload animation — overrides base pose
     if (reloadState.active) {
-        const t = reloadState.progress;   // 0 → 1
+        const t = reloadState.progress;
 
-        // Phase 1 (0.0–0.3): gun dips down and rotates
-        // Phase 2 (0.3–0.7): gun stays low, subtle shake (magazine change)
-        // Phase 3 (0.7–1.0): gun swings back up
         let dip = 0;
         let tilt = 0;
         let shake = 0;
 
         if (t < 0.3) {
-            const p = t / 0.3;                        // 0→1
+            const p = t / 0.3;
             dip = easeOutCubic(p) * 0.4;
             tilt = easeOutCubic(p) * 0.9;
         } else if (t < 0.7) {
             dip = 0.4;
             tilt = 0.9;
-            // Subtle shake during magazine swap
-            const shakePhase = (t - 0.3) / 0.4;       // 0→1
+            const shakePhase = (t - 0.3) / 0.4;
             shake = Math.sin(shakePhase * Math.PI * 6) * 0.04;
         } else {
-            const p = (t - 0.7) / 0.3;                // 0→1
+            const p = (t - 0.7) / 0.3;
             dip = (1 - easeInCubic(p)) * 0.4;
             tilt = (1 - easeInCubic(p)) * 0.9;
         }
@@ -717,7 +847,6 @@ export function updateViewModel(time, isMoving) {
         targetX += shake;
     }
 
-    // Smooth lerp toward target
     const lerp = 0.25;
     gunModel.position.x += (targetX - gunModel.position.x) * lerp;
     gunModel.position.y += (targetY - gunModel.position.y) * lerp;
@@ -737,7 +866,7 @@ function easeInCubic(t) {
 
 let tracerGroup = new THREE.Group();
 let muzzleFlash = null;
-const activeTracers = [];   // { mesh, geo, mat, expireAt }
+const activeTracers = [];
 
 export function spawnBulletTracer(startPos, endPos, hitNormal, isHit, hitPoint, isLocalShot = true) {
     const distance = startPos.distanceTo(endPos);
@@ -747,7 +876,6 @@ export function spawnBulletTracer(startPos, endPos, hitNormal, isHit, hitPoint, 
     geometry.translate(0, distance / 2, 0);
     const material = new THREE.MeshBasicMaterial({ color: 0xffff00 });
 
-    // ✅ Only show muzzle flash for LOCAL shots
     if (isLocalShot) {
         if (!muzzleFlash) {
             muzzleFlash = new THREE.PointLight(0xffaa00, 5, 5);

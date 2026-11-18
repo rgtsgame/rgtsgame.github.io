@@ -14,9 +14,11 @@ class HUD {
         this.sbEl = document.getElementById('scoreboard');
         this.damageEl = document.getElementById('damage-flash');
         this.hudEl = document.getElementById('hud');
-        this.ammoEl     = document.getElementById('ammo-val');
-        this.reserveEl  = document.getElementById('reserve-val');
+        this.ammoEl = document.getElementById('ammo-val');
+        this.reserveEl = document.getElementById('reserve-val');
         this.reloadHint = document.getElementById('reload-hint');
+        this.reserveEl = document.getElementById('reserve-val');
+        this.weaponNameEl = document.getElementById('weapon-name');
 
         document.addEventListener('keydown', e => {
             if (e.code === 'Tab') {
@@ -67,14 +69,11 @@ class HUD {
     }
 
     setAmmo(current, max, reserve = null) {
-        if (this.ammoEl) this.ammoEl.textContent = current;
+        if (this.ammoEl) this.ammoEl.textContent = current === Infinity ? '∞' : current;
         if (reserve !== null && this.reserveEl) {
-            this.reserveEl.textContent = reserve;
+            this.reserveEl.textContent = reserve === Infinity ? '∞' : reserve;
         }
-        // Warn state when low
-        if (this.ammoEl) {
-            this.ammoEl.classList.toggle('low', current <= 5);
-        }
+        if (this.ammoEl) this.ammoEl.classList.toggle('low', current <= 5 && current !== Infinity);
     }
 
     showReloading() {
@@ -131,6 +130,17 @@ class HUD {
         entry._exitTimer = exitTimer;
     }
 
+    setWeaponName(name) {
+        const el = document.getElementById('weapon-name');
+        if (el) el.textContent = name;
+    }
+
+    highlightSlot(slotNum) {
+        document.querySelectorAll('#hotbar .slot').forEach(el => el.classList.remove('active'));
+        const target = document.getElementById(`slot-${slotNum}`);
+        if (target) target.classList.add('active');
+    }
+
     updateScoreboard(rows) {
         if (!this.sbBody) return;
         this.sbBody.innerHTML = '';
@@ -182,6 +192,7 @@ export let hud = null;
 
 soundManager.load('shoot', 'shoot.mp3');
 soundManager.load('gun_reload', 'gun_reload.mp3');
+soundManager.load('sword_attack', 'sword_attack.mp3');
 
 function openLoginPopup() {
     const parentOrigin = window.location.origin;
@@ -208,7 +219,7 @@ window.addEventListener("DOMContentLoaded", () => {
 
         const displayName = localStorage.getItem('displayName');
         if (displayName) {
-            document.getElementById("player-name").innerHTML = `<span class="level-badge">1</span> ` + displayName;
+            document.getElementById("username-input").value = displayName;
         }
 
         document.getElementById("login-btn").innerText = displayName || "未設定名稱";
@@ -221,6 +232,13 @@ window.addEventListener("DOMContentLoaded", () => {
             location.reload();
         });
     }
+});
+
+document.querySelectorAll('#hotbar .slot').forEach(slot => {
+    slot.addEventListener('click', () => {
+        const key = slot.dataset.key;
+        import('./game.js').then(m => m.switchWeapon?.(parseInt(key)));
+    });
 });
 
 document.getElementById("login-btn").addEventListener("click", openLoginPopup);
@@ -241,8 +259,8 @@ document.getElementById("error-back-btn").addEventListener("click", () => {
     }, 600);
 });
 
-const loadingOverlay = document.getElementById('loading-overlay');
-const loadingText = document.getElementById('loading-text');
+export const loadingOverlay = document.getElementById('loading-overlay');
+export const loadingText = document.getElementById('loading-text');
 const menuContainer = document.getElementById('menu-container');
 const playBtn = document.getElementById('btn-play');
 const crosshair = document.getElementById('crosshair');
@@ -254,7 +272,7 @@ initRenderer(canvas);
 let isGameActive = false;
 let mapData = null;
 
-playBtn.addEventListener('click', async () => {
+playBtn.addEventListener('click', () => {
     if (isGameActive) return;
     if (!mapData) {
         alert("Map not loaded yet!");
@@ -268,16 +286,16 @@ playBtn.addEventListener('click', async () => {
 
     crosshair.classList.remove('hidden');
 
-    hud?.show();
-    hud?.setHealth(100);
-    hud?.setAmmo(30, 30);
+    hud.show();
+    hud.setHealth(100);
+    hud.setAmmo(30, 30, 90);
+    hud.setWeaponName('AK-47');
+    hud.highlightSlot(1);
 
     loadingOverlay.classList.add('show');
-    loadingText.innerText = "正在連線至伺服器...";
+    loadingText.innerText = "正在加入遊戲...";
 
-    await syncManager.connectForGame();
-
-    loadingOverlay.classList.remove('show');
+    syncManager.connectForGame();
 
     canvas.requestPointerLock();
 });
@@ -330,6 +348,8 @@ async function boot() {
     } else {
         serverStatusText.innerHTML = `<span style="color: #F44336;">🔴 伺服器已離線</span>`;
     }
+
+    playBtn.disabled = false;
 
     serverStatusText.classList.remove("pinging");
 }

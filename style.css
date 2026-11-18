@@ -211,6 +211,15 @@ body {
     background: #218838;
 }
 
+.large-play-btn:disabled {
+    font-size: 28px;
+    padding: 20px;
+    background: #979797;
+    color: #5c5c5c;
+    border-radius: 8px;
+    cursor: no-drop;
+}
+
 .loadout-box,
 .server-status {
     background: rgba(20, 20, 20, 0.8);
@@ -319,7 +328,7 @@ button {
 #loading-overlay {
     position: fixed;
     inset: 0;
-    background: #111;
+    background: #111111e0;
     display: flex;
     flex-direction: column;
     align-items: center;
@@ -580,4 +589,206 @@ button {
     display: block;
     width: 100%;
     height: 100%;
+}
+
+#ammo-bar {
+    position: absolute;
+    right: 24px;
+    bottom: 24px;
+    color: #fff;
+    font-size: 28px;
+    font-weight: 800;
+    text-shadow: 0 0 6px #000, 0 0 2px #000;
+    letter-spacing: 1px;
+    font-variant-numeric: tabular-nums;
+}
+
+#ammo-bar .ammo-sep {
+    color: #888;
+    font-size: 20px;
+    margin: 0 4px;
+}
+
+#ammo-bar #reserve-val {
+    color: #aaa;
+    font-size: 18px;
+}
+
+/* Low ammo warning */
+#ammo-val.low {
+    color: #ffaa00;
+}
+
+/* Empty flash on failed click */
+#ammo-val.empty {
+    animation: ammoEmpty 0.5s ease-out;
+}
+
+@keyframes ammoEmpty {
+    0% {
+        color: #ff3333;
+        transform: scale(1.15);
+    }
+
+    100% {
+        color: #fff;
+        transform: scale(1);
+    }
+}
+
+/* Reloading pulse */
+#ammo-val.reloading {
+    animation: ammoReloading 0.6s ease-in-out infinite alternate;
+}
+
+@keyframes ammoReloading {
+    from {
+        color: #ed8e18;
+        opacity: 0.5;
+    }
+
+    to {
+        color: #ed8e18;
+        opacity: 1.0;
+    }
+}
+
+/* Reload hint text */
+#reload-hint {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%) translateY(40px);
+    color: #ed8e18;
+    font-size: 16px;
+    font-weight: bold;
+    letter-spacing: 3px;
+    text-shadow: 0 0 8px rgba(237, 142, 24, 0.7);
+    opacity: 0;
+    transition: opacity 0.2s ease-out;
+    pointer-events: none;
+}
+
+#reload-hint.show {
+    opacity: 1;
+    animation: reloadPulse 1.2s ease-in-out infinite;
+}
+
+@keyframes reloadPulse {
+
+    0%,
+    100% {
+        opacity: 0.5;
+    }
+
+    50% {
+        opacity: 1.0;
+    }
+}
+
+/* Hotbar — bottom center */
+#hotbar {
+    position: absolute;
+    left: 50%;
+    bottom: 20px;
+    transform: translateX(-50%);
+    display: flex;
+    gap: 8px;
+    padding: 6px;
+    background: rgba(0, 0, 0, 0.4);
+    border-radius: 8px;
+    backdrop-filter: blur(4px);
+    pointer-events: auto;
+}
+
+#hotbar .slot {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    width: 80px;
+    height: 60px;
+    background: rgba(20, 20, 20, 0.7);
+    border: 2px solid #30363d;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: all 0.15s;
+    color: #aaa;
+    font-size: 11px;
+    user-select: none;
+}
+
+#hotbar .slot:hover {
+    border-color: #555;
+    background: rgba(40, 40, 40, 0.8);
+}
+
+#hotbar .slot.active {
+    border-color: #ed8e18;
+    background: rgba(237, 142, 24, 0.2);
+    color: #fff;
+    box-shadow: 0 0 12px rgba(237, 142, 24, 0.4);
+}
+
+#hotbar .slot-num {
+    font-size: 10px;
+    color: #666;
+    margin-bottom: 2px;
+}
+
+#hotbar .slot.active .slot-num {
+    color: #ed8e18;
+    font-weight: bold;
+}
+
+#hotbar .slot-name {
+    font-weight: 600;
+    letter-spacing: 0.3px;
+}
+
+/* Ammo bar update */
+#ammo-bar {
+    position: absolute;
+    right: 24px;
+    bottom: 24px;
+    color: #fff;
+    font-size: 28px;
+    font-weight: 800;
+    text-shadow: 0 0 6px #000, 0 0 2px #000;
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+}
+
+#weapon-name {
+    font-size: 12px;
+    font-weight: 600;
+    color: #ed8e18;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    margin-bottom: 4px;
+}
+
+#username-input {
+    background: transparent;
+    border: 2px dashed rgba(255, 255, 255, 0.3);
+    border-radius: 5px;
+    color: #fff;
+    font-size: 32px;
+    font-family: inherit;
+    font-weight: bold;
+    width: 320px;
+    outline: none;
+    text-align: left;
+    transition: border-color 0.2s, background 0.2s;
+    margin-left: 10px;
+    padding: 2px 8px;
+}
+
+#username-input:focus {
+    border-color: #ed8e18;
+    background: rgba(0, 0, 0, 0.5);
+}
+
+#username-input::placeholder {
+    color: rgba(255, 255, 255, 0.3);
 }

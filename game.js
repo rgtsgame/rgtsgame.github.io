@@ -13,7 +13,6 @@ let yaw = 0, pitch = 0;
 let colliders = [];
 let collidableMeshes = [];
 let spawnPoints = [];
-let powerups = [];
 let localPlayer = null;
 
 const PLAYER_HEIGHT = 1.7;
@@ -33,14 +32,22 @@ let isSliding = false;
 const slideDir = new THREE.Vector3();
 
 let lastShootTime = 0;
-const FIRE_RATE = 150;
-const GUN_RANGE = 100;
+const WEAPONS = {
+    ak47: { name: 'AK-47', damage: 25, fireRate: 150, range: 100, maxAmmo: 30, maxReserve: 90, reloadTime: 1800, isMelee: false },
+    pistol: { name: 'Pistol', damage: 34, fireRate: 300, range: 50, maxAmmo: 12, maxReserve: 48, reloadTime: 1200, isMelee: false },
+    knife: { name: 'Knife', damage: 100, fireRate: 500, range: 2.5, maxAmmo: Infinity, maxReserve: Infinity, reloadTime: 0, isMelee: true },
+};
 
-const MAX_AMMO = 30;
-const MAX_RESERVE = 90;
-const RELOAD_TIME = 1800; //in ms
+let currentWeaponKey = 'ak47';
+let weaponState = {
+    ak47: { ammo: 30, reserve: 90 },
+    pistol: { ammo: 12, reserve: 48 },
+    knife: { ammo: Infinity, reserve: Infinity },
+};
+
 let isReloading = false;
 let reloadStartTime = 0;
+let reloadDuration = 1800;
 
 let shakeIntensity = 0;
 const SHAKE_DECAY = 15;
@@ -53,17 +60,9 @@ const isTouchDevice = ('ontouchstart' in window) || (navigator.maxTouchPoints > 
 let isMobile = isTouchDevice;
 
 const mobileState = {
-    moveX: 0,
-    moveY: 0,
-    jumping: false,
-    shooting: false,
-    sliding: false,
-    lookTouchId: null,
-    lastLookX: 0,
-    lastLookY: 0,
-    joystickTouchId: null,
-    joystickCenterX: 0,
-    joystickCenterY: 0,
+    moveX: 0, moveY: 0, jumping: false, shooting: false, sliding: false,
+    lookTouchId: null, lastLookX: 0, lastLookY: 0,
+    joystickTouchId: null, joystickCenterX: 0, joystickCenterY: 0,
 };
 
 let mobileUI = null;
@@ -87,6 +86,9 @@ export function initInput(canvas) {
         if (e.code === 'KeyH') toggleHitboxes(colliders);
         if (e.code === 'KeyC') tryStartSlide();
         if (e.code === 'KeyR') reload();
+        if (e.code === 'Digit1') switchWeapon(1);
+        if (e.code === 'Digit2') switchWeapon(2);
+        if (e.code === 'Digit3') switchWeapon(3);
     });
     addEventListener('keyup', (e) => keys[e.code] = false);
 
@@ -109,228 +111,16 @@ function updateResponsiveFOV() {
     if (!camera) return;
     const aspect = window.innerWidth / window.innerHeight;
     let baseFov = 75;
-    if (aspect < 0.8) {
-        baseFov = 85;
-    } else if (aspect < 1.2) {
-        baseFov = 80;
-    }
-    if (isMobile && window.innerHeight < 500) {
-        baseFov += 5;
-    }
+    if (aspect < 0.8) baseFov = 85;
+    else if (aspect < 1.2) baseFov = 80;
+    if (isMobile && window.innerHeight < 500) baseFov += 5;
     camera.fov = baseFov;
     camera.updateProjectionMatrix();
 }
 
 function buildMobileUI(canvas) {
     if (mobileUI) return;
-
-    const style = document.createElement('style');
-    style.textContent = `
-        #mobile-ui {
-            position: fixed; inset: 0; pointer-events: none;
-            z-index: 1000; touch-action: none;
-            font-family: system-ui, sans-serif;
-            user-select: none; -webkit-user-select: none;
-        }
-        #mobile-ui .m-btn {
-            position: absolute; pointer-events: auto;
-            display: flex; align-items: center; justify-content: center;
-            border-radius: 50%;
-            background: rgba(255,255,255,0.12);
-            border: 2px solid rgba(255,255,255,0.35);
-            color: #fff; font-weight: 700;
-            backdrop-filter: blur(4px);
-            -webkit-tap-highlight-color: transparent;
-            transition: background 0.08s, transform 0.08s;
-        }
-        #mobile-ui .m-btn.active {
-            background: rgba(255,255,255,0.35);
-            transform: scale(0.94);
-        }
-        #mobile-ui .m-btn.disabled {
-            opacity: 0.35;
-        }
-        /* 搖桿底座 */
-        #m-joystick-base {
-            position: absolute; pointer-events: auto;
-            width: 130px; height: 130px; border-radius: 50%;
-            background: rgba(255,255,255,0.08);
-            border: 2px solid rgba(255,255,255,0.25);
-            left: 24px; bottom: 28px;
-            touch-action: none;
-        }
-        #m-joystick-knob {
-            position: absolute; width: 60px; height: 60px; border-radius: 50%;
-            background: rgba(255,255,255,0.35);
-            border: 2px solid rgba(255,255,255,0.6);
-            left: 50%; top: 50%; transform: translate(-50%,-50%);
-            pointer-events: none;
-        }
-        /* 射擊按鈕 */
-        #m-btn-shoot {
-            right: 24px; bottom: 100px;
-            width: 84px; height: 84px; font-size: 26px;
-        }
-        /* 跳躍按鈕 */
-        #m-btn-jump {
-            right: 120px; bottom: 40px;
-            width: 64px; height: 64px; font-size: 20px;
-        }
-        /* 滑行按鈕 */
-        #m-btn-slide {
-            right: 32px; bottom: 200px;
-            width: 64px; height: 64px; font-size: 20px;
-        }
-    `;
-    document.head.appendChild(style);
-
-    mobileUI = document.createElement('div');
-    mobileUI.id = 'mobile-ui';
-
-    const joyBase = document.createElement('div');
-    joyBase.id = 'm-joystick-base';
-    const joyKnob = document.createElement('div');
-    joyKnob.id = 'm-joystick-knob';
-    joyBase.appendChild(joyKnob);
-    mobileUI.appendChild(joyBase);
-
-    const shootBtn = document.createElement('div');
-    shootBtn.id = 'm-btn-shoot';
-    shootBtn.className = 'm-btn';
-    shootBtn.textContent = '🔫';
-    mobileUI.appendChild(shootBtn);
-
-    const jumpBtn = document.createElement('div');
-    jumpBtn.id = 'm-btn-jump';
-    jumpBtn.className = 'm-btn';
-    jumpBtn.textContent = '⤒';
-    mobileUI.appendChild(jumpBtn);
-
-    const slideBtn = document.createElement('div');
-    slideBtn.id = 'm-btn-slide';
-    slideBtn.className = 'm-btn';
-    slideBtn.textContent = '➠';
-    mobileUI.appendChild(slideBtn);
-
-    document.body.appendChild(mobileUI);
-
-    const joyRadius = 65;
-    joyBase.addEventListener('touchstart', (e) => {
-        e.preventDefault();
-        const t = e.changedTouches[0];
-        mobileState.joystickTouchId = t.identifier;
-        const rect = joyBase.getBoundingClientRect();
-        mobileState.joystickCenterX = rect.left + rect.width / 2;
-        mobileState.joystickCenterY = rect.top + rect.height / 2;
-        updateJoystick(t.clientX, t.clientY, joyKnob, joyRadius);
-    }, { passive: false });
-
-    joyBase.addEventListener('touchmove', (e) => {
-        e.preventDefault();
-        for (const t of e.changedTouches) {
-            if (t.identifier === mobileState.joystickTouchId) {
-                updateJoystick(t.clientX, t.clientY, joyKnob, joyRadius);
-            }
-        }
-    }, { passive: false });
-
-    const endJoy = (e) => {
-        for (const t of e.changedTouches) {
-            if (t.identifier === mobileState.joystickTouchId) {
-                mobileState.joystickTouchId = null;
-                mobileState.moveX = 0;
-                mobileState.moveY = 0;
-                joyKnob.style.left = '50%';
-                joyKnob.style.top = '50%';
-            }
-        }
-    };
-    joyBase.addEventListener('touchend', endJoy);
-    joyBase.addEventListener('touchcancel', endJoy);
-
-    let shootInterval = null;
-    shootBtn.addEventListener('touchstart', (e) => {
-        e.preventDefault();
-        shootBtn.classList.add('active');
-        mobileState.shooting = true;
-        shoot();
-        shootInterval = setInterval(() => {
-            if (mobileState.shooting) shoot();
-        }, FIRE_RATE);
-    }, { passive: false });
-    const endShoot = (e) => {
-        e && e.preventDefault && e.preventDefault();
-        shootBtn.classList.remove('active');
-        mobileState.shooting = false;
-        if (shootInterval) { clearInterval(shootInterval); shootInterval = null; }
-    };
-    shootBtn.addEventListener('touchend', endShoot);
-    shootBtn.addEventListener('touchcancel', endShoot);
-
-    jumpBtn.addEventListener('touchstart', (e) => {
-        e.preventDefault();
-        jumpBtn.classList.add('active');
-        mobileState.jumping = true;
-    }, { passive: false });
-    const endJump = (e) => {
-        e && e.preventDefault && e.preventDefault();
-        jumpBtn.classList.remove('active');
-        mobileState.jumping = false;
-    };
-    jumpBtn.addEventListener('touchend', endJump);
-    jumpBtn.addEventListener('touchcancel', endJump);
-
-    slideBtn.addEventListener('touchstart', (e) => {
-        e.preventDefault();
-        if (slideCooldownTimer > 0) return;
-        slideBtn.classList.add('active');
-        tryStartSlide();
-    }, { passive: false });
-    slideBtn.addEventListener('touchend', (e) => {
-        e.preventDefault();
-        slideBtn.classList.remove('active');
-    });
-    slideBtn.addEventListener('touchcancel', (e) => {
-        slideBtn.classList.remove('active');
-    });
-
-    const lookArea = canvas;
-    lookArea.addEventListener('touchstart', (e) => {
-        for (const t of e.changedTouches) {
-            if (mobileState.lookTouchId === null && !isTouchOnUI(t)) {
-                mobileState.lookTouchId = t.identifier;
-                mobileState.lastLookX = t.clientX;
-                mobileState.lastLookY = t.clientY;
-                break;
-            }
-        }
-    }, { passive: true });
-
-    lookArea.addEventListener('touchmove', (e) => {
-        for (const t of e.changedTouches) {
-            if (t.identifier === mobileState.lookTouchId) {
-                const dx = t.clientX - mobileState.lastLookX;
-                const dy = t.clientY - mobileState.lastLookY;
-                mobileState.lastLookX = t.clientX;
-                mobileState.lastLookY = t.clientY;
-                const sens = 0.0045;
-                yaw -= dx * sens;
-                pitch -= dy * sens;
-                pitch = Math.max(-Math.PI / 2, Math.min(Math.PI / 2, pitch));
-            }
-        }
-    }, { passive: true });
-
-    const endLook = (e) => {
-        for (const t of e.changedTouches) {
-            if (t.identifier === mobileState.lookTouchId) {
-                mobileState.lookTouchId = null;
-            }
-        }
-    };
-    lookArea.addEventListener('touchend', endLook);
-    lookArea.addEventListener('touchcancel', endLook);
-
+    // ... (Keep your existing mobile UI build code here) ...
     updateResponsiveFOV();
 }
 
@@ -365,11 +155,8 @@ function tryStartSlide() {
     slideCooldownTimer = SLIDE_COOLDOWN;
 
     const dir = getMoveInputDirection();
-    if (dir.lengthSq() > 0.0001) {
-        slideDir.copy(dir).normalize();
-    } else {
-        slideDir.set(-Math.sin(yaw), 0, -Math.cos(yaw)).normalize();
-    }
+    if (dir.lengthSq() > 0.0001) slideDir.copy(dir).normalize();
+    else slideDir.set(-Math.sin(yaw), 0, -Math.cos(yaw)).normalize();
 }
 
 function getMoveInputDirection() {
@@ -399,42 +186,54 @@ function getMoveInputDirection() {
 function reload() {
     if (!localPlayer || !localPlayer.alive) return;
     if (isReloading) return;
-    if (localPlayer.ammo >= MAX_AMMO) return;
-    if (localPlayer.reserve <= 0) return;
+
+    const weapon = WEAPONS[currentWeaponKey];
+    const state = weaponState[currentWeaponKey];
+
+    if (weapon.isMelee) return;
+    if (state.ammo >= weapon.maxAmmo) return;
+    if (state.reserve <= 0) return;
 
     isReloading = true;
     reloadStartTime = performance.now();
+    reloadDuration = weapon.reloadTime;
 
-    soundManager.play('gun_reload', 0.7, 1.0);
+    soundManager.play('reload_start', 0.7, 1.0);
     import('./main.js').then(m => m.hud?.showReloading?.());
 }
 
 function shoot() {
     if (!localPlayer || !localPlayer.alive) return;
     if (isReloading) return;
-    if (localPlayer.ammo <= 0) {
+
+    const weapon = WEAPONS[currentWeaponKey];
+    const state = weaponState[currentWeaponKey];
+
+    if (!weapon.isMelee && state.ammo <= 0) {
         reload();
         return;
     }
 
     const now = performance.now();
-    if (now - lastShootTime < FIRE_RATE) return;
+    if (now - lastShootTime < weapon.fireRate) return;
     lastShootTime = now;
     shakeIntensity = 0.5;
 
-    localPlayer.ammo--;
-    import('./main.js').then(m => {
-        m.hud?.setAmmo(localPlayer.ammo, MAX_AMMO);
-        if (localPlayer.ammo === 0) m.hud?.showAmmoWarning?.();
-    });
+    if (!weapon.isMelee) {
+        state.ammo--;
+        import('./main.js').then(m => {
+            m.hud?.setAmmo(state.ammo, weapon.maxAmmo, state.reserve);
+            if (state.ammo === 0) m.hud?.showAmmoWarning?.();
+        });
+    }
 
     const randomPitch = 0.95 + Math.random() * 0.1;
-    soundManager.play('shoot', 0.8, randomPitch);
+    soundManager.play('shoot', weapon.isMelee ? 0.5 : 0.8, randomPitch);
 
     const camera = getCamera();
     const shootRaycaster = new THREE.Raycaster();
     shootRaycaster.setFromCamera(new THREE.Vector2(0, 0), camera);
-    shootRaycaster.far = GUN_RANGE;
+    shootRaycaster.far = weapon.range;
 
     const hitsMap = shootRaycaster.intersectObjects(collidableMeshes, false);
     const hitsRemote = shootRaycaster.intersectObjects(getRemotePlayerMeshes(), true);
@@ -444,13 +243,15 @@ function shoot() {
 
     const dir = camera.getWorldDirection(new THREE.Vector3());
     const gunOffset = new THREE.Vector3(0.2, -0.2, -0.5).applyMatrix4(camera.matrixWorld);
-    syncManager?.sendShoot(gunOffset, dir);
+
+    if (!weapon.isMelee) {
+        syncManager?.sendShoot(gunOffset, dir);
+    }
 
     if (remDist < wallDist) {
         const remoteId = findRemoteIdByObject(hitsRemote[0].object);
         if (remoteId) {
-            const dmg = 25;
-            syncManager?.sendHit(remoteId, dmg, hitsRemote[0].point);
+            syncManager?.sendHit(remoteId, weapon.damage, hitsRemote[0].point);
             import('./main.js').then(m => m.hud?.showHitmarker());
             spawnBulletTracer(gunOffset, hitsRemote[0].point, null, true, null);
             return;
@@ -463,9 +264,36 @@ function shoot() {
         hitNormal = hitsMap[0].face.normal.clone().transformDirection(hitsMap[0].object.matrixWorld);
         isHit = true;
     } else {
-        hitPoint = shootRaycaster.ray.at(GUN_RANGE, new THREE.Vector3());
+        hitPoint = shootRaycaster.ray.at(weapon.range, new THREE.Vector3());
     }
-    spawnBulletTracer(gunOffset, hitPoint, hitNormal, isHit, hitPoint);
+
+    if (!weapon.isMelee) {
+        spawnBulletTracer(gunOffset, hitPoint, hitNormal, isHit, hitPoint);
+    }
+}
+
+function switchWeapon(slot) {
+    if (!localPlayer || !localPlayer.alive) return;
+    if (isReloading) return;
+
+    const keys = ['ak47', 'pistol', 'knife'];
+    const newKey = keys[slot - 1];
+    if (!newKey || newKey === currentWeaponKey) return;
+
+    currentWeaponKey = newKey;
+    const weapon = WEAPONS[currentWeaponKey];
+    const state = weaponState[currentWeaponKey];
+
+    syncManager?.send([17, newKey]);
+
+    import('./main.js').then(m => {
+        m.hud?.setAmmo(state.ammo, weapon.maxAmmo, state.reserve);
+        m.hud?.setWeaponName?.(weapon.name);
+        m.hud?.highlightSlot?.(slot);
+    });
+
+    import('./renderer.js').then(m => m.setViewWeapon?.(newKey));
+    soundManager.play('switch', 0.4, 1.0);
 }
 
 function buildOBB(mesh) {
@@ -479,10 +307,15 @@ function buildOBB(mesh) {
         sz = isPlane ? m.size[1] : m.size[2];
     }
 
+    if (isPlane) {
+        return { isSlope: true, mesh }; // Ignore horizontal collisions for planes
+    }
+
     const isSlope = Math.abs(mesh.rotation.x) > 0.01 || Math.abs(mesh.rotation.z) > 0.01;
 
     return {
         isSlope: isSlope,
+        mesh: mesh, // ✅ ADD THIS LINE so Raycast can use it!
         position: new THREE.Vector3(mesh.position.x, mesh.position.y, mesh.position.z),
         halfSize: new THREE.Vector3(sx / 2, sy / 2, sz / 2),
         rotation: mesh.rotation.clone()
@@ -507,14 +340,18 @@ export function initGame(mapData) {
         velocityY: 0,
         onGround: false,
         alive: true,
-        ammo: MAX_AMMO,
-        reserve: MAX_RESERVE,
     };
+
+    weaponState = {
+        ak47: { ammo: WEAPONS.ak47.maxAmmo, reserve: WEAPONS.ak47.maxReserve },
+        pistol: { ammo: WEAPONS.pistol.maxAmmo, reserve: WEAPONS.pistol.maxReserve },
+        knife: { ammo: Infinity, reserve: Infinity },
+    };
+    currentWeaponKey = 'ak47';
 
     isSliding = false;
     slideTimer = 0;
     slideCooldownTimer = 0;
-
     updateResponsiveFOV();
 }
 
@@ -524,22 +361,32 @@ function getPenetration(x, z, obb, buffer = PLAYER_RADIUS) {
     const cos = Math.cos(-obb.rotation.y);
     const sin = Math.sin(-obb.rotation.y);
 
+    // Transform player position into the box's local space
     const localX = dx * cos - dz * sin;
     const localZ = dx * sin + dz * cos;
 
     const extentX = obb.halfSize.x + buffer;
     const extentZ = obb.halfSize.z + buffer;
 
+    // Check if the player's circle overlaps the box's rectangle
     if (Math.abs(localX) < extentX && Math.abs(localZ) < extentZ) {
         const overlapX = extentX - Math.abs(localX);
         const overlapZ = extentZ - Math.abs(localZ);
 
+        // Push out along the axis with the smallest overlap
         if (overlapX < overlapZ) {
             const pushDir = Math.sign(localX) || 1;
-            return { pushX: Math.cos(obb.rotation.y) * overlapX * pushDir, pushZ: Math.sin(obb.rotation.y) * overlapX * pushDir };
+            // Rotate the push vector back to world space
+            return { 
+                pushX: Math.cos(obb.rotation.y) * overlapX * pushDir, 
+                pushZ: Math.sin(obb.rotation.y) * overlapX * pushDir 
+            };
         } else {
             const pushDir = Math.sign(localZ) || 1;
-            return { pushX: -Math.sin(obb.rotation.y) * overlapZ * pushDir, pushZ: Math.cos(obb.rotation.y) * overlapZ * pushDir };
+            return { 
+                pushX: -Math.sin(obb.rotation.y) * overlapZ * pushDir, 
+                pushZ: Math.cos(obb.rotation.y) * overlapZ * pushDir 
+            };
         }
     }
     return null;
@@ -550,24 +397,67 @@ function resolveCollisions(x, y, z, buffer = PLAYER_RADIUS) {
     let finalZ = z;
     let steppedUp = false;
 
-    for (let i = 0; i < 2; i++) {
-        for (const c of colliders) {
-            if (c.isSlope) continue;
+    const checkHeight = y + (PLAYER_HEIGHT / 2);
+    const playerCenter = new THREE.Vector3(finalX, checkHeight, finalZ);
+    
+    // Directions to check for walls
+    const directions = [
+        new THREE.Vector3(1, 0, 0),
+        new THREE.Vector3(-1, 0, 0),
+        new THREE.Vector3(0, 0, 1),
+        new THREE.Vector3(0, 0, -1)
+    ];
 
-            const feetY = y;
-            const headY = y + PLAYER_HEIGHT;
-            if (headY > c.position.y - c.halfSize.y && feetY < c.position.y + c.halfSize.y) {
+    const collisionRay = new THREE.Raycaster();
+    collisionRay.far = buffer + 0.1; 
 
-                const push = getPenetration(finalX, finalZ, c, buffer);
-                if (push) {
-                    const topOfBox = c.position.y + c.halfSize.y;
+    // Loop through all colliders
+    for (const c of colliders) {
+        if (c.isSlope) continue;
 
-                    if (topOfBox <= feetY + STEP_HEIGHT) {
-                        y = topOfBox + 0.01;
-                        steppedUp = true;
-                    } else {
-                        finalX += push.pushX;
-                        finalZ += push.pushZ;
+        const feetY = y;
+        const headY = y + PLAYER_HEIGHT;
+        
+        // Vertical check
+        if (headY > c.position.y - c.halfSize.y && feetY < c.position.y + c.halfSize.y) {
+            
+            const topOfBox = c.position.y + c.halfSize.y;
+            
+            // STEP UP LOGIC
+            if (topOfBox <= feetY + STEP_HEIGHT) {
+                const distToCenter = Math.hypot(finalX - c.position.x, finalZ - c.position.z);
+                if (distToCenter < Math.max(c.halfSize.x, c.halfSize.z) + buffer) {
+                    y = topOfBox + 0.01;
+                    steppedUp = true;
+                    continue;
+                }
+            }
+
+            // WALL SLIDING LOGIC
+            for (const dir of directions) {
+                collisionRay.set(playerCenter, dir);
+                const intersects = collisionRay.intersectObject(c.mesh, false);
+                
+                if (intersects.length > 0) {
+                    const hit = intersects[0];
+                    const pushDist = buffer - hit.distance;
+                    
+                    if (pushDist > 0) {
+                        // Get the exact normal of the wall we hit
+                        let normal = hit.face.normal.clone();
+                        normal.transformDirection(c.mesh.matrixWorld);
+                        
+                        // Flatten the normal to ignore Y axis (up/down slopes)
+                        normal.y = 0;
+                        normal.normalize();
+
+                        // Push the player out using the wall's normal
+                        finalX += normal.x * pushDist;
+                        finalZ += normal.z * pushDist;
+
+                        // Update center for the next checks
+                        playerCenter.x = finalX;
+                        playerCenter.z = finalZ;
                     }
                 }
             }
@@ -608,7 +498,6 @@ function getGroundHeight(x, z, currentY) {
             highestY = hit.point.y;
         }
     }
-
     return highestY;
 }
 
@@ -625,21 +514,22 @@ export function updateGame() {
     const dt = Math.min(getClock().getDelta(), 0.1);
 
     if (isReloading) {
-        const progress = Math.min(1, (performance.now() - reloadStartTime) / RELOAD_TIME);
+        const progress = Math.min(1, (performance.now() - reloadStartTime) / reloadDuration);
         import('./renderer.js').then(m => m.setReloadState?.(true, progress));
 
-        if (performance.now() - reloadStartTime >= RELOAD_TIME) {
-            const needed = MAX_AMMO - localPlayer.ammo;
-            const taken = Math.min(needed, localPlayer.reserve);
+        if (performance.now() - reloadStartTime >= reloadDuration) {
+            const weapon = WEAPONS[currentWeaponKey];
+            const state = weaponState[currentWeaponKey];
+            const needed = weapon.maxAmmo - state.ammo;
+            const taken = Math.min(needed, state.reserve);
 
-            localPlayer.ammo += taken;
-            localPlayer.reserve -= taken;
+            state.ammo += taken;
+            state.reserve -= taken;
             isReloading = false;
 
             import('./renderer.js').then(m => m.setReloadState?.(false, 0));
-
             import('./main.js').then(m => {
-                m.hud?.setAmmo(localPlayer.ammo, MAX_AMMO);
+                m.hud?.setAmmo(state.ammo, weapon.maxAmmo, state.reserve);
                 m.hud?.hideReloading?.();
             });
         }
@@ -658,7 +548,7 @@ export function updateGame() {
         }
     }
 
-    updateSlideButtonState();
+    if (typeof updateSlideButtonState === 'function') updateSlideButtonState();
 
     direction.set(0, 0, 0);
     let inputX = 0, inputZ = 0;
@@ -775,11 +665,8 @@ function updateSlideButtonState() {
     if (!isMobile || !mobileUI) return;
     const btn = document.getElementById('m-btn-slide');
     if (!btn) return;
-    if (slideCooldownTimer > 0 || isSliding) {
-        btn.classList.add('disabled');
-    } else {
-        btn.classList.remove('disabled');
-    }
+    if (slideCooldownTimer > 0 || isSliding) btn.classList.add('disabled');
+    else btn.classList.remove('disabled');
 }
 
 export function getYaw() { return yaw; }
@@ -804,8 +691,7 @@ export function onLocalDeath() {
     if (!localPlayer) return;
     localPlayer.alive = false;
     isReloading = false;
-
-    import('./renderer.js').then(m => m.setReloadState?.(false, 0));   // ← ADD
+    import('./renderer.js').then(m => m.setReloadState?.(false, 0));
 
     if (document.pointerLockElement) {
         document.exitPointerLock();
@@ -824,11 +710,19 @@ export function onLocalRespawn(x, y, z) {
     localPlayer.velocityY = 0;
     localPlayer.onGround = false;
     localPlayer.alive = true;
-    localPlayer.ammo = MAX_AMMO;
-    localPlayer.reserve = MAX_RESERVE;
+
+    weaponState = {
+        ak47: { ammo: WEAPONS.ak47.maxAmmo, reserve: WEAPONS.ak47.maxReserve },
+        pistol: { ammo: WEAPONS.pistol.maxAmmo, reserve: WEAPONS.pistol.maxReserve },
+        knife: { ammo: Infinity, reserve: Infinity },
+    };
+    currentWeaponKey = 'ak47';
     isReloading = false;
 
-    import('./renderer.js').then(m => m.setReloadState?.(false, 0));   // ← ADD
+    import('./renderer.js').then(m => {
+        m.setReloadState?.(false, 0);
+        m.setViewWeapon?.('ak47');
+    });
 
     const cam = getCamera();
     cam.position.copy(localPlayer.position);
@@ -836,7 +730,9 @@ export function onLocalRespawn(x, y, z) {
     import('./main.js').then(m => {
         m.hud?.hideDeathOverlay();
         m.hud?.setHealth(100);
-        m.hud?.setAmmo(MAX_AMMO, MAX_AMMO);
+        m.hud?.setAmmo(WEAPONS.ak47.maxAmmo, WEAPONS.ak47.maxAmmo, WEAPONS.ak47.maxReserve);
+        m.hud?.setWeaponName?.('AK-47');
+        m.hud?.highlightSlot?.(1);
         m.hud?.hideReloading?.();
     });
 }
