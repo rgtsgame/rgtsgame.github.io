@@ -19,16 +19,6 @@ class HUD {
         this.reloadHint = document.getElementById('reload-hint');
         this.reserveEl = document.getElementById('reserve-val');
         this.weaponNameEl = document.getElementById('weapon-name');
-
-        document.addEventListener('keydown', e => {
-            if (e.code === 'Tab') {
-                e.preventDefault();
-                this.sbEl?.classList.remove('hidden');
-            }
-        });
-        document.addEventListener('keyup', e => {
-            if (e.code === 'Tab') this.sbEl?.classList.add('hidden');
-        });
     }
 
     show() { this.hudEl?.classList.remove('hidden'); }
@@ -202,63 +192,6 @@ function openLoginPopup() {
     );
 }
 
-window.addEventListener('message', (event) => {
-    if (event.origin !== 'https://freegeometricgames.com') return;
-    if (event.data.type === 'AUTH_SUCCESS') {
-        const idToken = event.data.idToken;
-        const payload = JSON.parse(atob(idToken.split('.')[1]));
-        localStorage.setItem('authToken', idToken);
-        localStorage.setItem('uid', payload.userId);
-        localStorage.setItem('displayName', payload.name);
-        location.reload();
-    }
-});
-
-window.addEventListener("DOMContentLoaded", () => {
-    if (localStorage.getItem("authToken")) {
-
-        const displayName = localStorage.getItem('displayName');
-        if (displayName) {
-            document.getElementById("username-input").value = displayName;
-        }
-
-        document.getElementById("login-btn").innerText = displayName || "未設定名稱";
-
-        document.getElementById("login-btn").removeEventListener("click", openLoginPopup);
-        document.getElementById("login-btn").addEventListener("click", () => {
-            localStorage.removeItem("authToken");
-            localStorage.removeItem("uid");
-            localStorage.removeItem("displayName");
-            location.reload();
-        });
-    }
-});
-
-document.querySelectorAll('#hotbar .slot').forEach(slot => {
-    slot.addEventListener('click', () => {
-        const key = slot.dataset.key;
-        import('./game.js').then(m => m.switchWeapon?.(parseInt(key)));
-    });
-});
-
-document.getElementById("login-btn").addEventListener("click", openLoginPopup);
-
-document.getElementById("settings").addEventListener("click", (e) => {
-    if (e.ctrlKey) window.open(syncManager.serverUrl.replace("wss://", "https://").replace("/ws", "/admin.html"));
-});
-
-document.getElementById("error-back-btn").addEventListener("click", () => {
-    isGameActive = false;
-
-    document.getElementById("error-overlay").classList.remove("show");
-
-    menuContainer.style.display = 'flex';
-    setTimeout(() => {
-        canvas.style.display = "";
-        menuContainer.classList.remove("fade-out");
-    }, 600);
-});
-
 export const loadingOverlay = document.getElementById('loading-overlay');
 export const loadingText = document.getElementById('loading-text');
 const menuContainer = document.getElementById('menu-container');
@@ -271,14 +204,6 @@ initRenderer(canvas);
 
 let isGameActive = false;
 let mapData = null;
-
-playBtn.addEventListener('click', () => {
-    if (isGameActive) return;
-    if (!mapData) {
-        alert("Map not loaded yet!");
-        return;
-    }
-
     isGameActive = true;
 
     menuContainer.classList.add('fade-out');
