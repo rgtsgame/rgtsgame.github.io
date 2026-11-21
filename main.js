@@ -214,25 +214,26 @@ soundManager.load('sword_attack', 'sword_attack.mp3');
 //     }
 // });
 
-// window.addEventListener("DOMContentLoaded", () => {
-//     if (localStorage.getItem("authToken")) {
+document.getElementById("username-input").addEventListener("input", () => { localStorage.setItem("displayName", document.getElementById("username-input").value) });
 
-//         const displayName = localStorage.getItem('displayName');
-//         if (displayName) {
-//             document.getElementById("username-input").value = displayName;
-//         }
+window.addEventListener("DOMContentLoaded", () => {
+    // if (localStorage.getItem("authToken")) {
+    const displayName = localStorage.getItem('displayName');
+    if (displayName) {
+        document.getElementById("username-input").value = displayName;
+    }
 
-//         document.getElementById("login-btn").innerText = displayName || "未設定名稱";
+    // document.getElementById("login-btn").innerText = displayName || "未設定名稱";
 
-//         document.getElementById("login-btn").removeEventListener("click", openLoginPopup);
-//         document.getElementById("login-btn").addEventListener("click", () => {
-//             localStorage.removeItem("authToken");
-//             localStorage.removeItem("uid");
-//             localStorage.removeItem("displayName");
-//             location.reload();
-//         });
-//     }
-// });
+    // document.getElementById("login-btn").removeEventListener("click", openLoginPopup);
+    // document.getElementById("login-btn").addEventListener("click", () => {
+    //     localStorage.removeItem("authToken");
+    //     localStorage.removeItem("uid");
+    //     localStorage.removeItem("displayName");
+    //     location.reload();
+    // });
+    // }
+});
 
 document.querySelectorAll('#hotbar .slot').forEach(slot => {
     slot.addEventListener('click', () => {
@@ -269,7 +270,7 @@ const canvas = document.getElementById('game-canvas');
 
 initRenderer(canvas);
 
-let isGameActive = false;
+export let isGameActive = false;
 let mapData = null;
 
 playBtn.addEventListener('click', () => {
@@ -330,18 +331,18 @@ async function boot() {
 
     initCharacterPreview('character-preview');
 
+    initGame(mapData);
+    initInput(canvas);
+
+    requestAnimationFrame(loop);
+
     serverStatusText.innerText = "正在尋找伺服器...";
     await syncManager.fetchServerUrl();
 
     serverStatusText.innerText = "正在測試延遲...";
     const ping = await syncManager.pingServer();
 
-    initGame(mapData);
-    initInput(canvas);
-
     hud = new HUD();
-
-    requestAnimationFrame(loop);
 
     if (ping !== null) {
         serverStatusText.innerHTML = `🟢 伺服器在線<br><span style="color: #4CAF50; font-size: 16px;">延遲: 約 ${ping}ms</span>`;

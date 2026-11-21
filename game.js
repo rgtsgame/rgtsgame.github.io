@@ -4,7 +4,7 @@ import {
     spawnBulletTracer,
     getRemotePlayerMeshes, findRemoteIdByObject
 } from './renderer.js';
-import { soundManager, syncManager } from './main.js';
+import { soundManager, syncManager, isGameActive } from './main.js';
 
 const keys = {};
 const direction = new THREE.Vector3();
@@ -32,6 +32,7 @@ let isSliding = false;
 const slideDir = new THREE.Vector3();
 
 let lastShootTime = 0;
+let isMouseDown = false;
 const WEAPONS = {
     ak47: { name: 'AK-47', damage: 25, fireRate: 150, range: 100, maxAmmo: 30, maxReserve: 90, reloadTime: 1800, isMelee: false },
     pistol: { name: 'Pistol', damage: 34, fireRate: 300, range: 50, maxAmmo: 12, maxReserve: 48, reloadTime: 1200, isMelee: false },
@@ -82,6 +83,8 @@ export function initInput(canvas) {
     });
 
     addEventListener('keydown', (e) => {
+        if (!isGameActive) return;
+
         keys[e.code] = true;
         if (e.code === 'KeyH') toggleHitboxes(colliders);
         if (e.code === 'KeyC') tryStartSlide();
@@ -95,7 +98,21 @@ export function initInput(canvas) {
     addEventListener('mousedown', (e) => {
         if (isMobile) return;
         if (document.pointerLockElement === canvas && e.button === 0) {
+            isMouseDown = true;
             shoot();
+        }
+    });
+
+    addEventListener('mouseup', (e) => {
+        if (isMobile) return;
+        if (e.button === 0) {
+            isMouseDown = false;
+        }
+    });
+
+    document.addEventListener('pointerlockchange', () => {
+        if (document.pointerLockElement !== canvas) {
+            isMouseDown = false;
         }
     });
 
@@ -147,6 +164,10 @@ function updateJoystick(clientX, clientY, knob, radius) {
 
 function tryStartSlide() {
     if (!localPlayer || !localPlayer.alive) return;
+    
+    // ✅ ADD THIS LINE: Prevent sliding if not touching the ground
+    if (!localPlayer.onGround) return; 
+    
     if (slideCooldownTimer > 0) return;
     if (isSliding) return;
 
@@ -155,8 +176,11 @@ function tryStartSlide() {
     slideCooldownTimer = SLIDE_COOLDOWN;
 
     const dir = getMoveInputDirection();
-    if (dir.lengthSq() > 0.0001) slideDir.copy(dir).normalize();
-    else slideDir.set(-Math.sin(yaw), 0, -Math.cos(yaw)).normalize();
+    if (dir.lengthSq() > 0.0001) {
+        slideDir.copy(dir).normalize();
+    } else {
+        slideDir.set(-Math.sin(yaw), 0, -Math.cos(yaw)).normalize();
+    }
 }
 
 function getMoveInputDirection() {
@@ -300,22 +324,28 @@ function buildOBB(mesh) {
     const m = mesh.userData.originalData;
     const isPlane = m.type === 'plane';
 
+    // If it's a plane (the ground), we make its height 0 and mark it as a slope
+    // so it is ignored by walls, but still detected by raycasts.
+    if (isPlane) {
+        return {
+            isSlope: true,
+            mesh: mesh,
+            position: new THREE.Vector3(mesh.position.x, mesh.position.y, mesh.position.z),
+            halfSize: new THREE.Vector3(0, 0, 0),
+            rotation: mesh.rotation.clone()
+        };
+    }
+
     let sx = 1, sy = 1, sz = 1;
     if (Array.isArray(m.size)) {
-        sx = isPlane ? m.size[0] : m.size[0];
-        sy = isPlane ? 0.1 : m.size[1];
-        sz = isPlane ? m.size[1] : m.size[2];
+        sx = m.size[0];
+        sy = m.size[1];
+        sz = m.size[2];
     }
-
-    if (isPlane) {
-        return { isSlope: true, mesh }; // Ignore horizontal collisions for planes
-    }
-
-    const isSlope = Math.abs(mesh.rotation.x) > 0.01 || Math.abs(mesh.rotation.z) > 0.01;
 
     return {
-        isSlope: isSlope,
-        mesh: mesh, // ✅ ADD THIS LINE so Raycast can use it!
+        isSlope: false,
+        mesh: mesh,
         position: new THREE.Vector3(mesh.position.x, mesh.position.y, mesh.position.z),
         halfSize: new THREE.Vector3(sx / 2, sy / 2, sz / 2),
         rotation: mesh.rotation.clone()
@@ -392,7 +422,7 @@ function getPenetration(x, z, obb, buffer = PLAYER_RADIUS) {
     return null;
 }
 
-function resolveCollisions(x, y, z, buffer = PLAYER_RADIUS) {
+function resolveCollisions(x, y, z, isGrounded, buffer = PLAYER_RADIUS) {
     let finalX = x;
     let finalZ = z;
     let steppedUp = false;
@@ -425,11 +455,14 @@ function resolveCollisions(x, y, z, buffer = PLAYER_RADIUS) {
             
             // STEP UP LOGIC
             if (topOfBox <= feetY + STEP_HEIGHT) {
-                const distToCenter = Math.hypot(finalX - c.position.x, finalZ - c.position.z);
-                if (distToCenter < Math.max(c.halfSize.x, c.halfSize.z) + buffer) {
-                    y = topOfBox + 0.01;
-                    steppedUp = true;
-                    continue;
+                // ✅ Only step up if grounded and we are close to the wall
+                if (isGrounded) {
+                    const distToCenter = Math.hypot(finalX - c.position.x, finalZ - c.position.z);
+                    if (distToCenter < Math.max(c.halfSize.x, c.halfSize.z) + buffer) {
+                        y = topOfBox + 0.01;
+                        steppedUp = true;
+                        continue;
+                    }
                 }
             }
 
@@ -490,7 +523,8 @@ function getGroundHeight(x, z, currentY) {
 
     raycaster.set(new THREE.Vector3(x, currentY, z), downVector);
     raycaster.far = PLAYER_HEIGHT + 1.5;
-    const intersects = raycaster.intersectObjects(collidableMeshes, false);
+    const boxMeshes = collidableMeshes.filter(m => m.userData.originalData.type === 'box');
+    const intersects = raycaster.intersectObjects(boxMeshes, false);
 
     if (intersects.length > 0) {
         const hit = intersects[0];
@@ -585,7 +619,7 @@ export function updateGame() {
     let nextZ = localPlayer.position.z + moveZ;
     let feetY = localPlayer.position.y - PLAYER_HEIGHT;
 
-    const resolved = resolveCollisions(nextX, feetY, nextZ);
+    const resolved = resolveCollisions(nextX, feetY, nextZ, localPlayer.onGround);
     nextX = resolved.x;
     nextZ = resolved.z;
     feetY = resolved.y;

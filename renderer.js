@@ -772,6 +772,10 @@ export function getLoadedMeshes() {
 export function toggleHitboxes(colliders) {
     if (debugHitboxesGroup) {
         scene.remove(debugHitboxesGroup);
+        debugHitboxesGroup.traverse(obj => {
+            if (obj.geometry) obj.geometry.dispose();
+            if (obj.material) obj.material.dispose();
+        });
         debugHitboxesGroup = null;
         return;
     }
@@ -780,15 +784,30 @@ export function toggleHitboxes(colliders) {
     const debugMat = new THREE.LineBasicMaterial({ color: 0xff0000 });
 
     for (const c of colliders) {
-        // Generate a BoxGeometry based on the halfSize
-        const geo = new THREE.BoxGeometry(c.halfSize.x * 2, c.halfSize.y * 2, c.halfSize.z * 2);
+        // If it's the ground plane (size 0), draw a flat red square at its Y position
+        if (c.isSlope && c.halfSize.x === 0) {
+            const planeGeo = new THREE.PlaneGeometry(120, 120); // Just a visual indicator
+            const edges = new THREE.EdgesGeometry(planeGeo);
+            const line = new THREE.LineSegments(edges, debugMat);
+            line.position.copy(c.position);
+            line.rotation.copy(c.rotation);
+            debugHitboxesGroup.add(line);
+            continue;
+        }
+
+        // Draw the REAL Oriented Bounding Box (OBB)
+        const geo = new THREE.BoxGeometry(
+            c.halfSize.x * 2, 
+            c.halfSize.y * 2, 
+            c.halfSize.z * 2
+        );
         const edges = new THREE.EdgesGeometry(geo);
         const line = new THREE.LineSegments(edges, debugMat);
 
-        // Apply the exact position and rotation from the OBB
         line.position.copy(c.position);
         line.rotation.copy(c.rotation);
 
+        geo.dispose();
         debugHitboxesGroup.add(line);
     }
 
